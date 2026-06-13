@@ -325,7 +325,7 @@ export default function ClientesPage() {
                 <td style={{ ...st.td, textAlign:'center' }}>{c.visit_count || 0}</td>
                 <td style={st.td}><Badge status={c.status} /></td>
                 <td style={st.td}>
-                  <div style={{ display:'flex', gap:6' }}>
+                  <div style={{ display:'flex', gap:6 }}>
                     <Link href={`/dashboard/clientes/${c.id}`}><button style={st.actBtn}>Ver</button></Link>
                     <button style={st.actBtn} onClick={()=>{ setEditCliente(c); setShowModal(true) }}>Editar</button>
                     <button style={{ ...st.actBtn, color:'#D85A30', borderColor:'#F5C4B3' }} onClick={()=>deleteCliente(c.id)}>Remover</button>
