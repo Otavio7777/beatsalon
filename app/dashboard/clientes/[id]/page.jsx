@@ -123,7 +123,7 @@ export default function ClienteDetailPage() {
     mdIco: { width:32, height:32, borderRadius:'50%', background:'#FBEAF0', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16 },
     addBtn:{ padding:'7px 14px', background:'#534AB7', color:'#fff', border:'none', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer' },
     actBtn:{ padding:'4px 10px', borderRadius:7, border:'1px solid #E3E1F0', background:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', color:'#8A87A0' },
-    statusBtns: { display:'flex', gap:7', flexWrap:'wrap' },
+    statusBtns: { display:'flex', gap:7, flexWrap:'wrap' },
   }
 
   if (loading) return <div style={{ padding:40, color:'#8A87A0', textAlign:'center' }}>Carregando...</div>
