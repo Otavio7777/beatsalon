@@ -160,25 +160,34 @@ function ClienteModal({ salonId, cliente, onClose, onSaved }) {
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function ClientesPage() {
   const { salon, user, loading: salonLoading } = useSalon()
-  const [clients,  setClients]  = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [search,   setSearch]   = useState('')
-  const [filter,   setFilter]   = useState('todos') // todos|ativo|em_risco|inativo
-  const [showModal, setShowModal] = useState(false)
+  const [clients,    setClients]    = useState([])
+  const [appts,      setAppts]      = useState([])   // agendamentos futuros
+  const [loading,    setLoading]    = useState(true)
+  const [search,     setSearch]     = useState('')
+  const [filter,     setFilter]     = useState('todos')
+  const [showModal,  setShowModal]  = useState(false)
   const [editCliente, setEditCliente] = useState(null)
   const sb = createClient()
 
   const fetchClients = useCallback(async () => {
     if (!salon?.id) return
     setLoading(true)
-    const { data } = await sb
-      .from('clients')
-      .select('*')
-      .eq('salon_id', salon.id)
-      .order('name')
-    setClients(data || [])
+    const [{ data: cls }, { data: aps }] = await Promise.all([
+      sb.from('clients').select('*').eq('salon_id', salon.id).order('name'),
+      sb.from('appointments')
+        .select('id, client_id, service_name, date, status')
+        .eq('salon_id', salon.id)
+        .gte('date', new Date().toISOString())
+        .in('status', ['agendado'])
+        .order('date'),
+    ])
+    setClients(cls || [])
+    setAppts(aps || [])
     setLoading(false)
   }, [salon?.id])
+
+  // Próximo agendamento de cada cliente
+  const nextAppt = (clientId) => appts.find(a => a.client_id === clientId)
 
   useEffect(() => { fetchClients() }, [fetchClients])
 
@@ -292,18 +301,22 @@ export default function ClientesPage() {
               <th style={st.th}>Serviço principal</th>
               <th style={st.th}>LTV</th>
               <th style={st.th}>Visitas</th>
+              <th style={st.th}>Próx. agenda</th>
               <th style={st.th}>Status</th>
               <th style={st.th}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={st.empty}>Carregando clientes...</td></tr>
+              <tr><td colSpan={9} style={st.empty}>Carregando clientes...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={8} style={st.empty}>
+              <tr><td colSpan={9} style={st.empty}>
                 {search ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado ainda. Clique em "+ Novo cliente" para começar.'}
               </td></tr>
-            ) : filtered.map(c => (
+            ) : filtered.map(c => {
+              const prox = nextAppt(c.id)
+              const proxDt = prox ? new Date(prox.date) : null
+              return (
               <tr key={c.id} style={st.tr}>
                 <td style={st.td}>
                   <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -323,6 +336,13 @@ export default function ClientesPage() {
                   {c.ltv ? `R$${Number(c.ltv).toLocaleString('pt-BR',{minimumFractionDigits:0})}` : '—'}
                 </td>
                 <td style={{ ...st.td, textAlign:'center' }}>{c.visit_count || 0}</td>
+                <td style={st.td}>
+                  {prox ? (
+                    <div style={{ background:'#E6F1FB', borderRadius:7, padding:'3px 8px', fontSize:11, color:'#0C447C', fontWeight:600, display:'inline-block' }}>
+                      📅 {proxDt.getDate()}/{proxDt.getMonth()+1} {proxDt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+                    </div>
+                  ) : <span style={{ color:'#E3E1F0' }}>—</span>}
+                </td>
                 <td style={st.td}><Badge status={c.status} /></td>
                 <td style={st.td}>
                   <div style={{ display:'flex', gap:6 }}>
@@ -332,7 +352,7 @@ export default function ClientesPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
