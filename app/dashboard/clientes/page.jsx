@@ -61,7 +61,7 @@ function ClienteModal({ salonId, cliente, onClose, onSaved }) {
   }
 
   const ov = {
-    overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
+    overlay: 'REPLACED_OVERLAY',
     box:     { background:'#fff', borderRadius:20, padding:'28px 28px 24px', width:'100%', maxWidth:520, maxHeight:'90vh', overflowY:'auto' },
     hd:      { fontSize:18, fontWeight:800, marginBottom:20 },
     grid2:   { display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 },
@@ -241,15 +241,15 @@ export default function ClientesPage() {
   if (salonLoading) return <div style={{ padding:40, color:'#8A87A0', textAlign:'center' }}>Carregando...</div>
 
   return (
-    <div style={st.page}>
+    <div className="pg">
       {/* Cabeçalho */}
       <div style={st.hd}>
-        <div style={st.h1}>👥 Clientes — CRM</div>
-        <div style={st.sub}>Gestão de relacionamento · {salon?.name || 'BeatSalon'}</div>
+        <div className="pg-h1">👥 Clientes — CRM</div>
+        <div className="pg-sub">Gestão de relacionamento · {salon?.name || 'BeatSalon'}</div>
       </div>
 
       {/* Métricas */}
-      <div style={st.metrics}>
+      <div className="grid-3">
         <div style={st.mc}><div style={st.ml}>Total de clientes</div><div style={st.mv}>{clients.length}</div><div style={st.md}>cadastrados</div></div>
         <div style={st.mc}><div style={st.ml}>Clientes ativos</div><div style={{...st.mv, color:'#1D9E75'}}>{ativos}</div><div style={st.md}>visitaram recentemente</div></div>
         <div style={st.mc}><div style={st.ml}>Em risco</div><div style={{...st.mv, color:'#D85A30'}}>{risco}</div><div style={st.md}>sem visita +30 dias</div></div>
@@ -267,7 +267,7 @@ export default function ClientesPage() {
       )}
 
       {/* Toolbar */}
-      <div style={st.toolbar}>
+      <div className="toolbar">
         <div style={st.search}>
           <span style={{ fontSize:16, color:'#8A87A0' }}>🔍</span>
           <input style={st.searchIn} placeholder="Buscar por nome ou telefone..." value={search} onChange={e=>setSearch(e.target.value)} />
@@ -291,7 +291,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Tabela */}
-      <div style={st.table}>
+      <div className="tbl-wrap">
         <table style={{ width:'100%', borderCollapse:'collapse' }}>
           <thead style={st.thead}>
             <tr>
