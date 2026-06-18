@@ -4,10 +4,11 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 
 const navItems = [
-  { href: '/dashboard/clientes',  icon: '👥', label: 'Clientes (CRM)' },
-  { href: '/dashboard/agenda',    icon: '📅', label: 'Agenda' },
-  { href: '/dashboard/relatorio', icon: '📊', label: 'Relatórios' },
-  { href: '/dashboard/produtos',  icon: '📦', label: 'Produtos' },
+  { href: '/dashboard/clientes',      icon: '👥', label: 'Clientes (CRM)' },
+  { href: '/dashboard/agenda',        icon: '📅', label: 'Agenda' },
+  { href: '/dashboard/relatorio',     icon: '📊', label: 'Relatórios' },
+  { href: '/dashboard/produtos',      icon: '📦', label: 'Produtos' },
+  { href: '/dashboard/configuracoes', icon: '⚙️', label: 'Configurações' },
 ]
 
 export default function DashboardLayout({ children }) {
