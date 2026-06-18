@@ -34,7 +34,7 @@ function ProdutoModal({ salonId, produto, onClose, onSaved }) {
   }
 
   const s = {
-    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16 },
+    overlay: 'REPLACED_OVERLAY',
     box:     { background:'#fff',borderRadius:20,padding:'28px',width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto' },
     hd:      { fontSize:18,fontWeight:800,marginBottom:18 },
     label:   { fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:5,display:'block',marginTop:12 },
@@ -45,8 +45,8 @@ function ProdutoModal({ salonId, produto, onClose, onSaved }) {
   }
 
   return (
-    <div style={s.overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={s.box}>
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
         <div style={s.hd}>{produto?.id ? 'Editar produto' : 'Novo produto'}</div>
         <div style={s.grid2}>
           <div style={{gridColumn:'1/-1'}}>
@@ -157,13 +157,13 @@ export default function ProdutosPage() {
   if (salonLoading) return <div style={{padding:40,color:'#8A87A0',textAlign:'center'}}>Carregando...</div>
 
   return (
-    <div style={st.page}>
+    <div className="pg">
       <div style={{marginBottom:20}}>
-        <div style={st.h1}>📦 Produtos</div>
-        <div style={st.sub}>Estoque e catálogo · {salon?.name || 'BeatSalon'}</div>
+        <div className="pg-h1">📦 Produtos</div>
+        <div className="pg-sub">Estoque e catálogo · {salon?.name || 'BeatSalon'}</div>
       </div>
 
-      <div style={st.metrics}>
+      <div className="grid-3">
         <div style={st.mc}><div style={st.ml}>Total de produtos</div><div style={st.mv}>{produtos.length}</div><div style={st.md}>cadastrados</div></div>
         <div style={st.mc}><div style={st.ml}>Baixo estoque</div><div style={{...st.mv,color: baixoEstoque.length > 0 ? '#D85A30' : '#1D9E75'}}>{baixoEstoque.length}</div><div style={st.md}>precisam repor</div></div>
         <div style={st.mc}><div style={st.ml}>Valor em estoque</div><div style={st.mv}>R${Math.round(valorEstoque).toLocaleString('pt-BR')}</div><div style={st.md}>custo total</div></div>
@@ -179,7 +179,7 @@ export default function ProdutosPage() {
         </div>
       )}
 
-      <div style={st.toolbar}>
+      <div className="toolbar">
         <div style={st.search}>
           <span style={{fontSize:16,color:'#8A87A0'}}>🔍</span>
           <input style={st.searchIn} placeholder="Buscar por nome ou SKU..." value={search} onChange={e=>setSearch(e.target.value)} />
@@ -196,7 +196,7 @@ export default function ProdutosPage() {
         <button style={st.addBtn} onClick={() => { setEditProd(null); setShowModal(true) }}>＋ Produto</button>
       </div>
 
-      <div style={st.table}>
+      <div className="tbl-wrap">
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead style={st.thead}>
             <tr>
