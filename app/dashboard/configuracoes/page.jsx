@@ -67,9 +67,9 @@ export default function ConfiguracoesPage() {
   if (salonLoading) return <div style={{padding:40,color:'#8A87A0',textAlign:'center'}}>Carregando...</div>
 
   return (
-    <div style={st.page}>
-      <div style={st.h1}>⚙️ Configurações</div>
-      <div style={st.sub}>Gerencie seu salão e link de agendamento · {salon?.name}</div>
+    <div className="pg">
+      <div className="pg-h1">⚙️ Configurações</div>
+      <div className="pg-sub">Gerencie seu salão e link de agendamento · {salon?.name}</div>
 
       {/* Link de agendamento */}
       <div style={st.card}>
