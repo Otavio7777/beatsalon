@@ -100,7 +100,7 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
   }
 
   const s = {
-    overlay:{ position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16 },
+    overlay: 'REPLACED_OVERLAY',
     box:    { background:'#fff',borderRadius:20,padding:'28px',width:'100%',maxWidth:460,maxHeight:'90vh',overflowY:'auto' },
     hd:     { fontSize:18,fontWeight:800,marginBottom:18 },
     label:  { fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:5,display:'block',marginTop:12 },
@@ -115,8 +115,8 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
   }
 
   return (
-    <div style={s.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={s.box}>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
         <div style={s.hd}>{appt?.id ? 'Editar agendamento' : 'Novo agendamento'}</div>
 
         {/* Busca de cliente */}
@@ -292,19 +292,19 @@ export default function AgendaPage() {
   if (salonLoading) return <div style={{ padding: 40, color: '#8A87A0', textAlign: 'center' }}>Carregando...</div>
 
   return (
-    <div style={st.page}>
+    <div className="pg">
       <div style={{ marginBottom: 20 }}>
-        <div style={st.h1}>📅 Agenda</div>
-        <div style={st.sub}>Agendamentos e compromissos · {salon?.name || 'BeatSalon'}</div>
+        <div className="pg-h1">📅 Agenda</div>
+        <div className="pg-sub">Agendamentos e compromissos · {salon?.name || 'BeatSalon'}</div>
       </div>
 
-      <div style={st.metrics}>
+      <div className="grid-3">
         <div style={st.mc}><div style={st.ml}>Hoje</div><div style={st.mv}>{totalHoje}</div><div style={st.md}>agendamentos</div></div>
         <div style={st.mc}><div style={st.ml}>Este mês</div><div style={st.mv}>{totalMes}</div><div style={st.md}>agendamentos</div></div>
         <div style={st.mc}><div style={st.ml}>Receita mês</div><div style={{ ...st.mv, color: '#1D9E75' }}>R${receitaMes.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</div><div style={st.md}>concluídos</div></div>
       </div>
 
-      <div style={st.toolbar}>
+      <div className="toolbar">
         <button style={st.navBtn} onClick={() => setCurrentDate(d => view === 'semana' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7) : new Date(d.getFullYear(), d.getMonth() - 1, 1))}>‹</button>
         <span style={{ fontWeight: 700, fontSize: 15, minWidth: 180, textAlign: 'center' }}>
           {view === 'semana'
