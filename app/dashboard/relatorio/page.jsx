@@ -153,10 +153,10 @@ export default function RelatorioPage() {
   if (salonLoading) return <div style={{ padding: 40, color: '#8A87A0', textAlign: 'center' }}>Carregando...</div>
 
   return (
-    <div style={st.page}>
+    <div className="pg">
       <div style={{ marginBottom: 20 }}>
-        <div style={st.h1}>📊 Relatórios</div>
-        <div style={st.sub}>Métricas integradas de clientes e agendamentos · {salon?.name || 'BeatSalon'}</div>
+        <div className="pg-h1">📊 Relatórios</div>
+        <div className="pg-sub">Métricas integradas de clientes e agendamentos · {salon?.name || 'BeatSalon'}</div>
       </div>
 
       <div style={st.periodo}>
@@ -166,7 +166,7 @@ export default function RelatorioPage() {
       </div>
 
       {/* KPIs */}
-      <div style={st.grid4}>
+      <div className="grid-4">
         <div style={st.mc}><div style={st.ml}>Receita</div><div style={{ ...st.mv, color: '#1D9E75' }}>R${receita.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</div><div style={st.md}>concluídos</div></div>
         <div style={st.mc}><div style={st.ml}>Atendimentos</div><div style={st.mv}>{concluidos.length}</div><div style={st.md}>realizados</div></div>
         <div style={st.mc}><div style={st.ml}>Ticket médio</div><div style={st.mv}>R${ticketMedio.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</div><div style={st.md}>por atendimento</div></div>
@@ -174,7 +174,7 @@ export default function RelatorioPage() {
       </div>
 
       {/* Gráficos lado a lado */}
-      <div style={st.grid2}>
+      <div className="cols-2">
         <div style={st.card}>
           <div style={st.cardHd}>Receita mensal</div>
           <div style={st.cardSb}>Últimos 6 meses (atendimentos concluídos)</div>
@@ -188,7 +188,7 @@ export default function RelatorioPage() {
       </div>
 
       {/* Clientes + Retenção */}
-      <div style={st.grid3}>
+      <div className="cols-3">
         {/* Saúde da base */}
         <div style={st.card}>
           <div style={st.cardHd}>Saúde da base</div>
