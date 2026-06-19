@@ -19,13 +19,14 @@ function today() {
 /* ---------- Modal de agendamento com busca de cliente ---------- */
 function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
   const [form, setForm] = useState({
-    client_name: '', client_id: null, service_name: '', date: '',
+    client_name: '', client_id: null, client_phone: '', service_name: '', date: '',
     value: '', status: 'agendado', notes: '', ...appt,
   })
   const [clientSearch, setClientSearch] = useState(appt?.client_name || '')
   const [clients, setClients] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [crmMsg, setCrmMsg] = useState(null) // { type:'new'|'linked', name }
   const searchRef = useRef(null)
   const sb = createClient()
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -47,55 +48,99 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
     setClientSearch(client.name)
     set('client_name', client.name)
     set('client_id', client.id)
+    set('client_phone', client.phone || '')
     if (!form.service_name && client.main_service) set('service_name', client.main_service)
     setShowDropdown(false)
   }
 
   const clearClient = () => {
-    setClientSearch('')
-    set('client_name', '')
-    set('client_id', null)
+    setClientSearch(''); set('client_name', ''); set('client_id', null); set('client_phone', '')
   }
 
-  /* Atualiza stats do cliente quando status = concluido */
+  /* Atualiza stats do cliente quando concluido */
   const updateClientStats = async (clientId, appointmentDate, value, previousStatus) => {
     if (!clientId || previousStatus === 'concluido') return
     const date = appointmentDate?.slice(0, 10) || new Date().toISOString().slice(0, 10)
-    const { data: current } = await sb.from('clients').select('visit_count, ltv, last_visit').eq('id', clientId).single()
-    if (!current) return
+    const { data: cur } = await sb.from('clients').select('visit_count, ltv').eq('id', clientId).single()
+    if (!cur) return
     await sb.from('clients').update({
-      visit_count: (current.visit_count || 0) + 1,
-      ltv: (current.ltv || 0) + (Number(value) || 0),
-      last_visit: date,
-      status: 'ativo',
+      visit_count: (cur.visit_count || 0) + 1,
+      ltv: (cur.ltv || 0) + (Number(value) || 0),
+      last_visit: date, status: 'ativo',
     }).eq('id', clientId)
+  }
+
+  /* Auto-vincula ou cria cliente pelo celular */
+  const autoVincularCelular = async (phone) => {
+    if (!phone || form.client_id) return null
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 8) return null
+
+    // Tenta RPC match_or_create_client
+    const { data, error } = await sb.rpc('match_or_create_client', {
+      p_salon_id:    salonId,
+      p_client_name: form.client_name || 'Cliente',
+      p_client_phone: digits,
+    })
+
+    if (!error && data?.client_id) {
+      return { clientId: data.client_id, clientName: data.client_name, isNew: data.is_new }
+    }
+
+    // Fallback: busca manual por telefone nos clientes já carregados
+    const normalized = digits
+    const found = clients.find(c => (c.phone || '').replace(/\D/g,'') === normalized)
+    if (found) return { clientId: found.id, clientName: found.name, isNew: false }
+
+    return null
   }
 
   const save = async () => {
     if (!form.client_name || !form.date) return
     setSaving(true)
-    const payload = {
-      client_name: form.client_name,
-      client_id: form.client_id || null,
-      service_name: form.service_name,
-      date: form.date,
-      value: Number(form.value) || 0,
-      status: form.status,
-      notes: form.notes,
-      salon_id: salonId,
+    setCrmMsg(null)
+
+    let finalClientId = form.client_id || null
+    let crmResult = null
+
+    // Auto-vincula pelo celular se não selecionou do CRM
+    if (!finalClientId && form.client_phone) {
+      crmResult = await autoVincularCelular(form.client_phone)
+      if (crmResult) finalClientId = crmResult.clientId
     }
+
+    const payload = {
+      client_name:  form.client_name,
+      client_id:    finalClientId,
+      service_name: form.service_name,
+      date:         form.date,
+      value:        Number(form.value) || 0,
+      status:       form.status,
+      notes:        form.notes,
+      salon_id:     salonId,
+    }
+
     if (appt?.id) {
       const { error } = await sb.from('appointments').update(payload).eq('id', appt.id)
-      if (!error && form.status === 'concluido' && form.client_id) {
-        await updateClientStats(form.client_id, form.date, form.value, appt.status)
+      if (!error && form.status === 'concluido' && finalClientId) {
+        await updateClientStats(finalClientId, form.date, form.value, appt.status)
       }
     } else {
       const { error } = await sb.from('appointments').insert(payload)
-      if (!error && form.status === 'concluido' && form.client_id) {
-        await updateClientStats(form.client_id, form.date, form.value, null)
+      if (!error && form.status === 'concluido' && finalClientId) {
+        await updateClientStats(finalClientId, form.date, form.value, null)
       }
     }
-    onSaved(); onClose()
+
+    onSaved()
+
+    if (crmResult) {
+      setCrmMsg({ type: crmResult.isNew ? 'new' : 'linked', name: crmResult.clientName })
+      setTimeout(() => { onClose() }, 2200)
+    } else {
+      onClose()
+    }
+
     setSaving(false)
   }
 
@@ -117,6 +162,19 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
+        {/* Feedback de vinculação CRM */}
+        {crmMsg && (
+          <div style={{
+            background: crmMsg.type==='new' ? '#E1F5EE' : '#EEEDFE',
+            borderRadius:10, padding:'10px 14px', marginBottom:14,
+            fontSize:13, fontWeight:600,
+            color: crmMsg.type==='new' ? '#085041' : '#534AB7',
+            display:'flex', alignItems:'center', gap:8,
+          }}>
+            {crmMsg.type==='new' ? '✨ Novo cliente criado no CRM:' : '🔗 Vinculado ao cadastro de'} <strong>{crmMsg.name}</strong>
+          </div>
+        )}
+
         <div style={s.hd}>{appt?.id ? 'Editar agendamento' : 'Novo agendamento'}</div>
 
         {/* Busca de cliente */}
@@ -151,6 +209,22 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Campo celular quando cliente não está vinculado ao CRM */}
+        {!form.client_id && (
+          <div style={{marginBottom:4}}>
+            <label style={s.label}>
+              Celular <span style={{fontWeight:400,textTransform:'none',color:'#534AB7'}}>(auto-vincula ao CRM 🔗)</span>
+            </label>
+            <input
+              style={s.input}
+              placeholder="(00) 00000-0000"
+              value={form.client_phone || ''}
+              onChange={e => set('client_phone', e.target.value)}
+              inputMode="tel"
+            />
           </div>
         )}
 
