@@ -1,101 +1,184 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../lib/supabase'
 
-const HORA_INICIO = 8
-const HORA_FIM    = 18
-const SERVICOS    = ['Corte','Barba','Corte + Barba','Coloração','Hidratação','Manicure','Pedicure','Sobrancelha','Outro']
-const MESES       = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+/* ── Configuração ── */
+const H_INICIO = 8
+const H_FIM    = 18
+const MESES  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+const DIAS   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+
+const SERVICES = [
+  { id:'corte',       icon:'✂️',  name:'Corte'        },
+  { id:'barba',       icon:'🪒',  name:'Barba'        },
+  { id:'corte-barba', icon:'💈',  name:'Corte + Barba'},
+  { id:'coloracao',   icon:'🎨',  name:'Coloração'    },
+  { id:'hidratacao',  icon:'💧',  name:'Hidratação'   },
+  { id:'manicure',    icon:'💅',  name:'Manicure'     },
+  { id:'pedicure',    icon:'🦶',  name:'Pedicure'     },
+  { id:'sobrancelha', icon:'✨',  name:'Sobrancelha'  },
+  { id:'outro',       icon:'➕',  name:'Outro'        },
+]
 
 function slots() {
   const s = []
-  for (let h = HORA_INICIO; h < HORA_FIM; h++) s.push(`${String(h).padStart(2,'0')}:00`)
+  for (let h = H_INICIO; h < H_FIM; h++)
+    s.push(`${String(h).padStart(2,'0')}:00`)
   return s
 }
-function fmtData(d) {
-  if (!d) return ''
-  const [y,m,dd] = d.split('-')
-  return `${dd}/${m}/${y}`
+
+function fmtData(ds) {
+  if (!ds) return ''
+  const [y,m,d] = ds.split('-')
+  return `${d}/${m}/${y}`
 }
+
+function fmtDataLong(ds) {
+  if (!ds) return ''
+  const d = new Date(ds + 'T12:00:00')
+  return `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`
+}
+
 function toISO(date, hora) { return `${date}T${hora}:00` }
 
-/* ── Calendário ── */
+function today() {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+/* ─────────────── Calendário ─────────────── */
 function Cal({ valor, onChange }) {
-  const hoje = new Date()
-  const [mes, setMes] = useState(hoje.getMonth())
-  const [ano, setAno] = useState(hoje.getFullYear())
-  const primeiroDia = new Date(ano, mes, 1).getDay()
-  const diasNoMes   = new Date(ano, mes + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < primeiroDia; i++) cells.push(null)
-  for (let d = 1; d <= diasNoMes; d++) cells.push(d)
-  const str    = (d) => `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-  const isPast = (d) => new Date(ano,mes,d) < new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())
-  const isSel  = (d) => valor === str(d)
+  const agora = today()
+  const [mes, setMes] = useState(agora.getMonth())
+  const [ano, setAno] = useState(agora.getFullYear())
+
+  const primeiro = new Date(ano, mes, 1).getDay()
+  const ultimo   = new Date(ano, mes + 1, 0).getDate()
+  const cells    = [...Array(primeiro).fill(null), ...Array.from({length:ultimo},(_,i)=>i+1)]
+
+  const str    = d => `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+  const isPast = d => new Date(ano,mes,d) < agora
+  const isTdy  = d => new Date(ano,mes,d).toDateString() === agora.toDateString()
+  const isSel  = d => valor === str(d)
+
+  const prev = () => { if(mes===0){setMes(11);setAno(a=>a-1)}else setMes(m=>m-1) }
+  const next = () => { if(mes===11){setMes(0);setAno(a=>a+1)}else setMes(m=>m+1) }
+
   return (
-    <div style={{userSelect:'none'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-        <button onClick={()=>{ if(mes===0){setMes(11);setAno(a=>a-1)}else setMes(m=>m-1) }}
-          style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#534AB7',padding:'4px 8px'}}>‹</button>
-        <span style={{fontWeight:700,fontSize:15}}>{MESES[mes]} {ano}</span>
-        <button onClick={()=>{ if(mes===11){setMes(0);setAno(a=>a+1)}else setMes(m=>m+1) }}
-          style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#534AB7',padding:'4px 8px'}}>›</button>
+    <div>
+      {/* Header do mês */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+        <button onClick={prev} style={{width:40,height:40,borderRadius:20,border:'1px solid #E3E1F0',background:'#fff',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#534AB7'}}>‹</button>
+        <span style={{fontWeight:800,fontSize:16,color:'#1A1825'}}>{MESES[mes]} {ano}</span>
+        <button onClick={next} style={{width:40,height:40,borderRadius:20,border:'1px solid #E3E1F0',background:'#fff',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#534AB7'}}>›</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
-        {DIAS_SEMANA.map(d=><div key={d} style={{textAlign:'center',fontSize:10,fontWeight:700,color:'#8A87A0',padding:'4px 0'}}>{d}</div>)}
+
+      {/* Dias da semana */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:6}}>
+        {DIAS.map(d=><div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'#8A87A0',padding:'4px 0'}}>{d}</div>)}
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+
+      {/* Dias */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>
         {cells.map((d,i) => d===null ? <div key={`e${i}`}/> : (
-          <div key={d} onClick={()=>!isPast(d)&&onChange(str(d))} style={{
-            textAlign:'center',padding:'9px 0',borderRadius:8,fontSize:13,fontWeight:600,
-            cursor:isPast(d)?'default':'pointer',
-            background:isSel(d)?'#534AB7':isPast(d)?'transparent':'#F2F1F8',
-            color:isSel(d)?'#fff':isPast(d)?'#C9C7D4':'#1A1825',
-            border:`2px solid ${isSel(d)?'#534AB7':'transparent'}`,
-          }}>{d}</div>
+          <div key={d}
+            onClick={() => !isPast(d) && onChange(str(d))}
+            style={{
+              aspectRatio:'1',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              borderRadius:'50%',fontSize:14,fontWeight:isSel(d)?800:isTdy(d)?700:500,
+              cursor:isPast(d)?'default':'pointer',
+              background: isSel(d)?'#534AB7' : 'transparent',
+              color: isSel(d)?'#fff' : isPast(d)?'#D4D2DF' : '#1A1825',
+              position:'relative',
+              transition:'all .15s',
+            }}>
+            {d}
+            {isTdy(d) && !isSel(d) && (
+              <span style={{position:'absolute',bottom:2,left:'50%',transform:'translateX(-50%)',width:4,height:4,borderRadius:2,background:'#534AB7'}}/>
+            )}
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-/* ── Página ── */
+/* ─────────────── Step indicator ─────────────── */
+function StepBar({ atual }) {
+  const passos = ['Serviço','Data','Horário','Dados']
+  return (
+    <div style={{padding:'0 4px',marginBottom:24}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',position:'relative'}}>
+        {/* Linha de fundo */}
+        <div style={{position:'absolute',top:14,left:'12%',right:'12%',height:2,background:'#E3E1F0',zIndex:0}}/>
+        {/* Linha de progresso */}
+        <div style={{
+          position:'absolute',top:14,left:'12%',height:2,background:'#534AB7',zIndex:1,
+          width:`${((atual-1)/3)*76}%`,transition:'width .4s ease',
+        }}/>
+        {passos.map((p,i) => {
+          const n    = i+1
+          const done = n < atual
+          const act  = n === atual
+          return (
+            <div key={p} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6,zIndex:2}}>
+              <div style={{
+                width:28,height:28,borderRadius:14,
+                background: done?'#534AB7' : act?'#534AB7' : '#fff',
+                border: `2px solid ${(done||act)?'#534AB7':'#E3E1F0'}`,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:12,fontWeight:700,
+                color: (done||act)?'#fff':'#8A87A0',
+                transition:'all .3s',
+              }}>
+                {done ? '✓' : n}
+              </div>
+              <span style={{fontSize:10,fontWeight:600,color:act?'#534AB7':done?'#534AB7':'#8A87A0'}}>{p}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────── Página principal ─────────────── */
 export default function AgendarPage({ params }) {
   const { salonId } = params
-  const [salon, setSalon]           = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [notFound, setNotFound]     = useState(false)
-  const [etapa, setEtapa]           = useState(1)
-  const [servico, setServico]       = useState('')
+  const [salon, setSalon]         = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [notFound, setNotFound]   = useState(false)
+  const [etapa, setEtapa]         = useState(1)
+  const [servico, setServico]     = useState(null)   // objeto { id, icon, name }
   const [servicoCustom, setServicoCustom] = useState('')
-  const [dataSel, setDataSel]       = useState('')
-  const [horaSel, setHoraSel]       = useState('')
-  const [ocupados, setOcupados]     = useState([])
+  const [dataSel, setDataSel]     = useState('')
+  const [horaSel, setHoraSel]     = useState('')
+  const [ocupados, setOcupados]   = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
-  const [nome, setNome]             = useState('')
-  const [fone, setFone]             = useState('')
-  const [obs, setObs]               = useState('')
-  const [salvando, setSalvando]     = useState(false)
-  const [erro, setErro]             = useState('')
-  const [resultado, setResultado]   = useState(null) // { isNew, clientName }
+  const [nome, setNome]           = useState('')
+  const [fone, setFone]           = useState('')
+  const [obs, setObs]             = useState('')
+  const [salvando, setSalvando]   = useState(false)
+  const [erro, setErro]           = useState('')
+  const [resultado, setResultado] = useState(null)
+  const topRef                    = useRef(null)
   const sb = createClient()
 
-  /* Busca salão */
   useEffect(() => {
     sb.from('salons').select('id,name,phone').eq('id',salonId).single()
       .then(({data,error}) => {
-        if (error||!data) { setNotFound(true); setLoading(false); return }
-        setSalon(data); setLoading(false)
+        if (error||!data) { setNotFound(true) }
+        else setSalon(data)
+        setLoading(false)
       })
-  },[salonId])
+  },[])
 
-  /* Busca slots ocupados */
   useEffect(() => {
     if (!dataSel||!salonId) return
-    setLoadingSlots(true)
+    setLoadingSlots(true); setHoraSel('')
     sb.from('appointments')
-      .select('date,status')
+      .select('date')
       .eq('salon_id',salonId)
       .gte('date',`${dataSel}T00:00:00`)
       .lte('date',`${dataSel}T23:59:59`)
@@ -104,17 +187,21 @@ export default function AgendarPage({ params }) {
         setOcupados((data||[]).map(a=>a.date?.slice(11,16)))
         setLoadingSlots(false)
       })
-  },[dataSel,salonId])
+  },[dataSel])
 
-  const servicoFinal = servico==='Outro' ? servicoCustom : servico
+  /* Scroll topo ao mudar etapa */
+  const irPara = (n) => {
+    setEtapa(n)
+    setTimeout(() => topRef.current?.scrollIntoView({behavior:'smooth',block:'start'}), 50)
+  }
 
-  /* ── Confirmação com auto-vinculação ao CRM ── */
+  const servicoFinal = servico?.id === 'outro' ? servicoCustom : servico?.name
+
   const confirmar = async () => {
     if (!nome.trim()) { setErro('Informe seu nome.'); return }
-    if (!fone.trim()) { setErro('Informe seu telefone/WhatsApp.'); return }
+    if (!fone.trim()) { setErro('Informe seu WhatsApp.'); return }
     setSalvando(true); setErro('')
 
-    // Usa o RPC book_appointment que auto-vincula/cria cliente
     const { data, error } = await sb.rpc('book_appointment', {
       p_salon_id:    salonId,
       p_client_name: nome.trim(),
@@ -125,224 +212,353 @@ export default function AgendarPage({ params }) {
     })
 
     if (error) {
-      // Fallback: insert direto se o RPC não existir ainda
+      // Fallback
       const { error: e2 } = await sb.from('appointments').insert({
-        salon_id:     salonId,
-        client_name:  nome.trim(),
-        service_name: servicoFinal,
-        date:         toISO(dataSel, horaSel),
-        value:        0,
-        status:       'agendado',
-        notes:        `${fone.trim()}${obs ? ' | '+obs : ''}`,
+        salon_id:salonId, client_name:nome.trim(), service_name:servicoFinal,
+        date:toISO(dataSel,horaSel), value:0, status:'agendado',
+        notes:`${fone.trim()}${obs ? ' | '+obs : ''}`,
       })
       if (e2) { setErro('Erro ao agendar. Tente novamente.'); setSalvando(false); return }
       setResultado({ isNew: null, clientName: nome.trim() })
     } else {
-      setResultado({
-        isNew:      data?.is_new_client,
-        clientName: data?.client_name || nome.trim(),
-      })
+      setResultado({ isNew: data?.is_new_client, clientName: data?.client_name || nome.trim() })
     }
 
-    setEtapa(5)
+    irPara(5)
     setSalvando(false)
   }
 
-  /* ── Estados visuais ── */
+  /* ── Loading ── */
   if (loading) return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F2F1F8'}}>
-      <div style={{textAlign:'center',color:'#8A87A0'}}>
-        <div style={{fontSize:40,marginBottom:12}}>✂️</div>
-        <div style={{fontWeight:600}}>Carregando...</div>
-      </div>
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#16112B',gap:16}}>
+      <div style={{fontSize:48}}>✂️</div>
+      <div style={{width:40,height:40,border:'3px solid rgba(255,255,255,.2)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 1s linear infinite'}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
   if (notFound) return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F2F1F8'}}>
-      <div style={{textAlign:'center',padding:32}}>
-        <div style={{fontSize:48,marginBottom:12}}>😕</div>
-        <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>Salão não encontrado</div>
-        <div style={{color:'#8A87A0',fontSize:14}}>O link pode ser inválido ou ter expirado.</div>
-      </div>
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'#F2F1F8',padding:32,textAlign:'center'}}>
+      <div style={{fontSize:56,marginBottom:16}}>😕</div>
+      <div style={{fontSize:20,fontWeight:800,marginBottom:8}}>Salão não encontrado</div>
+      <div style={{color:'#8A87A0',fontSize:15}}>O link pode ter expirado.</div>
     </div>
   )
 
-  const s = {
-    page:    { minHeight:'100vh', background:'#F2F1F8', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', paddingBottom:24 },
-    header:  { background:'#16112B', padding:'18px 0', textAlign:'center' },
-    logo:    { fontSize:22, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', gap:8 },
-    sname:   { fontSize:13, color:'rgba(255,255,255,.5)', marginTop:4 },
-    wrap:    { padding:'20px 16px', maxWidth:480, margin:'0 auto' },
-    card:    { background:'#fff', borderRadius:20, padding:'24px 20px', boxShadow:'0 4px 24px rgba(0,0,0,.08)' },
-    progBar: { display:'flex', gap:5, marginBottom:20 },
-    progSt:  { flex:1, height:4, borderRadius:4 },
-    label:   { fontSize:11, fontWeight:700, color:'#8A87A0', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'block', marginTop:14 },
-    input:   { width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid #E3E1F0', fontSize:14, outline:'none', color:'#1A1825', boxSizing:'border-box' },
-    svcGrid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 },
-    svcBtn:  (sel) => ({ padding:'11px 8px', borderRadius:10, border:`2px solid ${sel?'#534AB7':'#E3E1F0'}`, background:sel?'#EEEDFE':'#fff', color:sel?'#534AB7':'#8A87A0', fontSize:13, fontWeight:600, cursor:'pointer', textAlign:'center' }),
-    btn:     { width:'100%', padding:'14px', background:'#534AB7', color:'#fff', border:'none', borderRadius:12, fontSize:15, fontWeight:700, cursor:'pointer', marginTop:16 },
-    btnOut:  { width:'100%', padding:'11px', background:'#fff', color:'#534AB7', border:'2px solid #E3E1F0', borderRadius:12, fontSize:14, fontWeight:600, cursor:'pointer', marginTop:8 },
-    slotGrid:{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 },
-    slotBtn: (sel,ocu) => ({
-      padding:'12px 6px', borderRadius:10, textAlign:'center', fontSize:14, fontWeight:700,
-      cursor:ocu?'default':'pointer',
-      border:`2px solid ${ocu?'#F0EFF8':sel?'#534AB7':'#E3E1F0'}`,
-      background:ocu?'#F0EFF8':sel?'#534AB7':'#fff',
-      color:ocu?'#C9C7D4':sel?'#fff':'#1A1825',
-    }),
-    resumo:  { background:'#F2F1F8', borderRadius:12, padding:'14px 16px', marginBottom:18 },
-    confRow: { display:'flex', justifyContent:'space-between', padding:'9px 0', borderBottom:'1px solid #F2F1F8' },
-  }
+  /* ── Estilos base ── */
+  const css = `
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { background: #F2F1F8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    input { font-family: inherit; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+    @keyframes pop   { 0%{transform:scale(.8);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+    @keyframes spin  { to { transform: rotate(360deg) } }
+    .fade-up { animation: fadeUp .3s ease both }
+    .pop     { animation: pop .5s cubic-bezier(.175,.885,.32,1.275) both }
+  `
 
-  const passo = Math.min(etapa,4)
+  /* Botão CTA fixo */
+  const CTA = ({ label, onClick, disabled, secondary }) => (
+    <button onClick={onClick} disabled={disabled} style={{
+      width:'100%', padding:'15px', fontWeight:700, fontSize:15,
+      borderRadius:14, border: secondary ? '2px solid #E3E1F0' : 'none',
+      background: secondary ? '#fff' : disabled ? '#C9C7D4' : '#534AB7',
+      color: secondary ? '#8A87A0' : '#fff',
+      cursor: disabled ? 'default' : 'pointer',
+      transition:'all .15s',
+    }}>{label}</button>
+  )
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
-        <div style={s.logo}>✂️ BeatSalon</div>
-        <div style={s.sname}>{salon.name}</div>
-      </div>
+    <>
+      <style>{css}</style>
+      <div style={{minHeight:'100vh',background:'#F2F1F8',fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'}}>
 
-      <div style={s.wrap}>
-
-        {/* ── Etapa 5: Confirmado ── */}
-        {etapa===5 && (
-          <div style={s.card}>
-            <div style={{textAlign:'center',marginBottom:20}}>
-              <div style={{fontSize:56,marginBottom:12}}>🎉</div>
-              <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>Agendado!</div>
-              <div style={{fontSize:14,color:'#8A87A0'}}>Seu horário foi reservado com sucesso em <strong>{salon.name}</strong>.</div>
+        {/* ── Header ── */}
+        <div ref={topRef} style={{background:'#16112B',paddingTop:'env(safe-area-inset-top, 0px)'}}>
+          <div style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:40,height:40,borderRadius:20,background:'#534AB7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>✂️</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:800,color:'#fff',fontSize:16,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{salon.name}</div>
+              {etapa <= 4 && <div style={{fontSize:11,color:'rgba(255,255,255,.45)',marginTop:1}}>Agendamento online</div>}
             </div>
-
-            {/* Badge de vinculação ao CRM */}
-            {resultado?.isNew === true && (
-              <div style={{background:'#E1F5EE',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#085041',fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
-                ✨ Cadastro criado automaticamente na base de clientes do salão.
-              </div>
-            )}
-            {resultado?.isNew === false && (
-              <div style={{background:'#EEEDFE',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#534AB7',fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
-                🔗 Agendamento vinculado ao seu cadastro existente.
-              </div>
-            )}
-
-            <div style={{background:'#F2F1F8',borderRadius:14,padding:'14px 16px'}}>
-              <div style={s.confRow}><span style={{color:'#8A87A0',fontSize:13}}>Serviço</span><span style={{fontWeight:700,fontSize:13}}>{servicoFinal}</span></div>
-              <div style={s.confRow}><span style={{color:'#8A87A0',fontSize:13}}>Data</span><span style={{fontWeight:700,fontSize:13}}>{fmtData(dataSel)}</span></div>
-              <div style={s.confRow}><span style={{color:'#8A87A0',fontSize:13}}>Horário</span><span style={{fontWeight:700,fontSize:13}}>{horaSel}</span></div>
-              <div style={{...s.confRow,borderBottom:'none'}}><span style={{color:'#8A87A0',fontSize:13}}>Cliente</span><span style={{fontWeight:700,fontSize:13}}>{resultado?.clientName||nome}</span></div>
-            </div>
-
-            {salon.phone && (
-              <a href={`https://wa.me/55${salon.phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                style={{...s.btn,display:'block',textAlign:'center',textDecoration:'none',background:'#25D366',marginTop:16}}>
-                💬 Confirmar no WhatsApp
-              </a>
-            )}
-            <div style={{textAlign:'center',marginTop:14,fontSize:12,color:'#C9C7D4'}}>Powered by ✂️ BeatSalon</div>
           </div>
-        )}
+        </div>
 
-        {/* ── Etapas 1–4 ── */}
-        {etapa<=4 && (
-          <div style={s.card}>
-            <div style={s.progBar}>
-              {[1,2,3,4].map(n=><div key={n} style={{...s.progSt,background:n<=passo?'#534AB7':'#E3E1F0'}}/>)}
-            </div>
-            <div style={{fontSize:11,color:'#8A87A0',fontWeight:600,marginBottom:18}}>
-              PASSO {etapa} DE 4 · {['SERVIÇO','DATA','HORÁRIO','SEUS DADOS'][etapa-1]}
-            </div>
+        {/* ── Conteúdo ── */}
+        <div style={{maxWidth:480,margin:'0 auto',padding:'20px 16px 100px'}}>
 
-            {/* Passo 1 — Serviço */}
-            {etapa===1 && <>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>Qual serviço deseja?</div>
-              <div style={{fontSize:13,color:'#8A87A0',marginBottom:18}}>Escolha ou descreva o que precisa.</div>
-              <div style={s.svcGrid}>
-                {SERVICOS.map(sv=>(
-                  <button key={sv} style={s.svcBtn(servico===sv)} onClick={()=>setServico(sv)}>{sv}</button>
-                ))}
+          {/* Etapa de sucesso */}
+          {etapa === 5 && (
+            <div className="fade-up">
+              {/* Ícone de sucesso */}
+              <div style={{textAlign:'center',padding:'32px 0 24px'}}>
+                <div className="pop" style={{
+                  width:80,height:80,borderRadius:40,
+                  background:'linear-gradient(135deg,#1D9E75,#0E6A4E)',
+                  display:'inline-flex',alignItems:'center',justifyContent:'center',
+                  fontSize:36,marginBottom:16,boxShadow:'0 8px 24px rgba(29,158,117,.35)',
+                }}>✓</div>
+                <div style={{fontSize:26,fontWeight:800,color:'#1A1825',marginBottom:8}}>Agendado!</div>
+                <div style={{fontSize:15,color:'#8A87A0',lineHeight:1.5}}>
+                  Seu horário foi reservado com sucesso em<br/>
+                  <strong style={{color:'#1A1825'}}>{salon.name}</strong>
+                </div>
               </div>
-              {servico==='Outro' && (
-                <input style={s.input} placeholder="Descreva o serviço..." value={servicoCustom} onChange={e=>setServicoCustom(e.target.value)} />
-              )}
-              <button style={{...s.btn,opacity:!servico||(servico==='Outro'&&!servicoCustom)?.5:1}}
-                disabled={!servico||(servico==='Outro'&&!servicoCustom)}
-                onClick={()=>setEtapa(2)}>Próximo →</button>
-            </>}
 
-            {/* Passo 2 — Data */}
-            {etapa===2 && <>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>Quando você quer vir?</div>
-              <div style={{fontSize:13,color:'#8A87A0',marginBottom:18}}>Selecione a data disponível.</div>
-              <Cal valor={dataSel} onChange={setDataSel} />
-              <button style={{...s.btn,opacity:!dataSel?.5:1}} disabled={!dataSel} onClick={()=>setEtapa(3)}>Próximo →</button>
-              <button style={s.btnOut} onClick={()=>setEtapa(1)}>← Voltar</button>
-            </>}
-
-            {/* Passo 3 — Horário */}
-            {etapa===3 && <>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>Qual horário?</div>
-              <div style={{fontSize:13,color:'#8A87A0',marginBottom:18}}>Disponíveis para {fmtData(dataSel)} — atendimento de 1 hora.</div>
-              {loadingSlots ? (
-                <div style={{textAlign:'center',color:'#8A87A0',padding:24}}>Verificando disponibilidade...</div>
-              ) : (
-                <div style={s.slotGrid}>
-                  {slots().map(slot=>{
-                    const ocu = ocupados.includes(slot)
-                    const sel = horaSel===slot
-                    return (
-                      <div key={slot} style={s.slotBtn(sel,ocu)} onClick={()=>!ocu&&setHoraSel(slot)}>
-                        {slot}
-                        {ocu&&<div style={{fontSize:9,marginTop:2,color:'#C9C7D4'}}>ocupado</div>}
-                      </div>
-                    )
-                  })}
+              {/* Badge de vinculação CRM */}
+              {resultado?.isNew === true && (
+                <div style={{display:'flex',alignItems:'center',gap:10,background:'#E1F5EE',borderRadius:14,padding:'12px 16px',marginBottom:12,border:'1px solid #A7DFC8'}}>
+                  <span style={{fontSize:20}}>✨</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:'#085041'}}>Cadastro criado!</div>
+                    <div style={{fontSize:12,color:'#0E7A54'}}>Você foi adicionado à base de clientes do salão.</div>
+                  </div>
                 </div>
               )}
-              <button style={{...s.btn,opacity:!horaSel?.5:1}} disabled={!horaSel} onClick={()=>setEtapa(4)}>Próximo →</button>
-              <button style={s.btnOut} onClick={()=>setEtapa(2)}>← Voltar</button>
-            </>}
+              {resultado?.isNew === false && (
+                <div style={{display:'flex',alignItems:'center',gap:10,background:'#EEEDFE',borderRadius:14,padding:'12px 16px',marginBottom:12,border:'1px solid #C5C2F0'}}>
+                  <span style={{fontSize:20}}>🔗</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:'#534AB7'}}>Vinculado ao seu cadastro</div>
+                    <div style={{fontSize:12,color:'#7F77DC'}}>Agendamento conectado ao seu histórico.</div>
+                  </div>
+                </div>
+              )}
 
-            {/* Passo 4 — Dados */}
-            {etapa===4 && <>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:6}}>Quase lá!</div>
-              <div style={{fontSize:13,color:'#8A87A0',marginBottom:18}}>Informe seus dados para confirmar.</div>
-
-              {/* Resumo */}
-              <div style={s.resumo}>
-                <div style={{fontSize:11,color:'#8A87A0',fontWeight:700,marginBottom:6}}>RESUMO</div>
-                <div style={{fontSize:14,fontWeight:700}}>{servicoFinal}</div>
-                <div style={{fontSize:13,color:'#534AB7',fontWeight:600,marginTop:3}}>📅 {fmtData(dataSel)} às {horaSel}</div>
+              {/* Card resumo */}
+              <div style={{background:'#fff',borderRadius:20,overflow:'hidden',boxShadow:'0 2px 16px rgba(0,0,0,.06)',marginBottom:16}}>
+                {[
+                  ['🎯 Serviço', servicoFinal],
+                  ['📅 Data',    fmtDataLong(dataSel)],
+                  ['⏰ Horário', horaSel],
+                  ['👤 Cliente', resultado?.clientName||nome],
+                  ['📱 Contato', fone],
+                ].map(([k,v]) => (
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'13px 18px',borderBottom:'1px solid #F2F1F8'}}>
+                    <span style={{fontSize:13,color:'#8A87A0'}}>{k}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:'#1A1825',textAlign:'right',maxWidth:'60%'}}>{v}</span>
+                  </div>
+                ))}
               </div>
 
-              <label style={s.label}>Seu nome *</label>
-              <input style={s.input} placeholder="Nome completo" value={nome} onChange={e=>setNome(e.target.value)} />
-
-              <label style={s.label}>WhatsApp / Telefone *</label>
-              <input style={s.input} placeholder="(00) 00000-0000" value={fone} onChange={e=>setFone(e.target.value)} inputMode="tel" />
-
-              {/* Aviso de vinculação automática */}
-              <div style={{background:'#E6F1FB',borderRadius:10,padding:'10px 14px',marginTop:12,fontSize:12,color:'#0C447C',display:'flex',gap:8,alignItems:'flex-start'}}>
-                <span>🔗</span>
-                <span>Seu telefone será usado para <strong>vincular ou criar seu cadastro</strong> automaticamente na base do salão.</span>
-              </div>
-
-              <label style={s.label}>Observações <span style={{fontWeight:400,textTransform:'none'}}>(opcional)</span></label>
-              <input style={s.input} placeholder="Ex: primeira vez, alergia..." value={obs} onChange={e=>setObs(e.target.value)} />
-
-              {erro && <div style={{fontSize:13,color:'#D85A30',marginTop:10,fontWeight:600}}>⚠️ {erro}</div>}
-
-              <button style={{...s.btn,opacity:salvando?.7:1}} disabled={salvando} onClick={confirmar}>
-                {salvando ? 'Agendando...' : '✓ Confirmar agendamento'}
+              {/* Ações */}
+              {salon.phone && (
+                <a href={`https://wa.me/55${salon.phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{display:'block',marginBottom:10,textDecoration:'none'}}>
+                  <div style={{background:'#25D366',borderRadius:14,padding:'15px',textAlign:'center',fontWeight:700,fontSize:15,color:'#fff'}}>
+                    💬 Confirmar via WhatsApp
+                  </div>
+                </a>
+              )}
+              <button onClick={()=>{ setEtapa(1);setServico(null);setDataSel('');setHoraSel('');setNome('');setFone('');setObs('');setResultado(null) }}
+                style={{width:'100%',padding:'13px',background:'#F2F1F8',borderRadius:14,border:'none',fontWeight:600,fontSize:14,color:'#8A87A0',cursor:'pointer'}}>
+                Fazer novo agendamento
               </button>
-              <button style={s.btnOut} onClick={()=>setEtapa(3)}>← Voltar</button>
-            </>}
-          </div>
-        )}
 
-        <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'#C9C7D4'}}>Powered by ✂️ BeatSalon</div>
+              <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'#C9C7D4'}}>Powered by ✂️ BeatSalon</div>
+            </div>
+          )}
+
+          {/* Etapas 1–4 */}
+          {etapa <= 4 && (
+            <div className="fade-up">
+              <StepBar atual={etapa} />
+
+              {/* ── Passo 1: Serviço ── */}
+              {etapa === 1 && (
+                <>
+                  <div style={{marginBottom:6,fontSize:22,fontWeight:800,color:'#1A1825'}}>Qual serviço?</div>
+                  <div style={{marginBottom:20,fontSize:14,color:'#8A87A0'}}>Toque para selecionar o que precisa.</div>
+
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
+                    {SERVICES.map(s => {
+                      const sel = servico?.id === s.id
+                      return (
+                        <button key={s.id} onClick={()=>setServico(s)} style={{
+                          padding:'14px 8px',borderRadius:16,border:`2px solid ${sel?'#534AB7':'#E3E1F0'}`,
+                          background: sel ? '#534AB7' : '#fff',
+                          display:'flex',flexDirection:'column',alignItems:'center',gap:6,
+                          cursor:'pointer',transition:'all .15s',
+                          boxShadow: sel ? '0 4px 12px rgba(83,74,183,.35)' : '0 1px 4px rgba(0,0,0,.06)',
+                        }}>
+                          <span style={{fontSize:26}}>{s.icon}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:sel?'#fff':'#1A1825',textAlign:'center',lineHeight:1.2}}>{s.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {servico?.id === 'outro' && (
+                    <input
+                      style={{width:'100%',padding:'13px 16px',borderRadius:12,border:'1px solid #E3E1F0',fontSize:14,outline:'none',color:'#1A1825',marginBottom:16,background:'#fff'}}
+                      placeholder="Descreva o serviço desejado..."
+                      value={servicoCustom}
+                      onChange={e=>setServicoCustom(e.target.value)}
+                      autoFocus
+                    />
+                  )}
+                </>
+              )}
+
+              {/* ── Passo 2: Data ── */}
+              {etapa === 2 && (
+                <>
+                  <div style={{marginBottom:6,fontSize:22,fontWeight:800,color:'#1A1825'}}>Qual data?</div>
+                  <div style={{marginBottom:20,fontSize:14,color:'#8A87A0'}}>Toque em um dia disponível.</div>
+                  <div style={{background:'#fff',borderRadius:20,padding:'20px',boxShadow:'0 2px 16px rgba(0,0,0,.06)',marginBottom:16}}>
+                    <Cal valor={dataSel} onChange={setDataSel} />
+                  </div>
+                  {dataSel && (
+                    <div style={{background:'#EEEDFE',borderRadius:12,padding:'10px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:18}}>📅</span>
+                      <span style={{fontWeight:700,color:'#534AB7',fontSize:14}}>{fmtDataLong(dataSel)}</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Passo 3: Horário ── */}
+              {etapa === 3 && (
+                <>
+                  <div style={{marginBottom:6,fontSize:22,fontWeight:800,color:'#1A1825'}}>Qual horário?</div>
+                  <div style={{marginBottom:16,fontSize:14,color:'#8A87A0'}}>
+                    Atendimentos de 1 hora · {fmtDataLong(dataSel)}
+                  </div>
+
+                  {loadingSlots ? (
+                    <div style={{textAlign:'center',padding:'40px 0',color:'#8A87A0'}}>
+                      <div style={{width:32,height:32,border:'3px solid #E3E1F0',borderTopColor:'#534AB7',borderRadius:'50%',animation:'spin 1s linear infinite',margin:'0 auto 12px'}}/>
+                      Verificando disponibilidade...
+                    </div>
+                  ) : (
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+                      {slots().map(slot => {
+                        const ocu = ocupados.includes(slot)
+                        const sel = horaSel === slot
+                        return (
+                          <button key={slot} onClick={()=>!ocu&&setHoraSel(slot)} style={{
+                            padding:'14px 8px',borderRadius:14,
+                            border:`2px solid ${ocu?'#F0EFF8':sel?'#534AB7':'#E3E1F0'}`,
+                            background: ocu?'#F7F6FD' : sel?'#534AB7':'#fff',
+                            cursor:ocu?'default':'pointer',
+                            transition:'all .15s',
+                            boxShadow: sel ? '0 4px 12px rgba(83,74,183,.35)' : 'none',
+                          }}>
+                            <div style={{fontSize:15,fontWeight:700,color:ocu?'#C9C7D4':sel?'#fff':'#1A1825'}}>{slot}</div>
+                            {ocu && <div style={{fontSize:10,color:'#C9C7D4',marginTop:2}}>ocupado</div>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {horaSel && (
+                    <div style={{background:'#EEEDFE',borderRadius:12,padding:'10px 16px',marginBottom:4,display:'flex',alignItems:'center',gap:10}}>
+                      <span style={{fontSize:18}}>⏰</span>
+                      <span style={{fontWeight:700,color:'#534AB7',fontSize:14}}>Selecionado: {horaSel}</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Passo 4: Dados ── */}
+              {etapa === 4 && (
+                <>
+                  <div style={{marginBottom:6,fontSize:22,fontWeight:800,color:'#1A1825'}}>Quase lá!</div>
+                  <div style={{marginBottom:16,fontSize:14,color:'#8A87A0'}}>Confirme seus dados para finalizar.</div>
+
+                  {/* Resumo compacto */}
+                  <div style={{background:'linear-gradient(135deg,#534AB7,#7F77DC)',borderRadius:18,padding:'16px 18px',marginBottom:20,color:'#fff'}}>
+                    <div style={{fontSize:12,opacity:.7,marginBottom:4,textTransform:'uppercase',letterSpacing:'.5px',fontWeight:600}}>Resumo do agendamento</div>
+                    <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{servicoFinal}</div>
+                    <div style={{fontSize:14,opacity:.9}}>{fmtDataLong(dataSel)} · {horaSel}</div>
+                  </div>
+
+                  {/* Nome */}
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Seu nome *</label>
+                    <input
+                      style={{width:'100%',padding:'14px 16px',borderRadius:14,border:`1.5px solid ${nome?'#534AB7':'#E3E1F0'}`,fontSize:15,outline:'none',color:'#1A1825',background:'#fff',transition:'border .2s'}}
+                      placeholder="Nome completo"
+                      value={nome}
+                      onChange={e=>setNome(e.target.value)}
+                      autoCapitalize="words"
+                    />
+                  </div>
+
+                  {/* WhatsApp */}
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>WhatsApp *</label>
+                    <div style={{position:'relative'}}>
+                      <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:16}}>📱</span>
+                      <input
+                        style={{width:'100%',padding:'14px 16px 14px 44px',borderRadius:14,border:`1.5px solid ${fone?'#534AB7':'#E3E1F0'}`,fontSize:15,outline:'none',color:'#1A1825',background:'#fff',transition:'border .2s'}}
+                        placeholder="(00) 00000-0000"
+                        value={fone}
+                        onChange={e=>setFone(e.target.value)}
+                        inputMode="tel"
+                      />
+                    </div>
+                    <div style={{fontSize:11,color:'#8A87A0',marginTop:5,display:'flex',alignItems:'center',gap:4}}>
+                      🔗 Seu celular vincula ou cria seu cadastro automaticamente
+                    </div>
+                  </div>
+
+                  {/* Observação */}
+                  <div style={{marginBottom:16}}>
+                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>
+                      Observação <span style={{textTransform:'none',fontWeight:400}}>(opcional)</span>
+                    </label>
+                    <input
+                      style={{width:'100%',padding:'14px 16px',borderRadius:14,border:'1.5px solid #E3E1F0',fontSize:15,outline:'none',color:'#1A1825',background:'#fff'}}
+                      placeholder="Ex: primeira vez, cor desejada..."
+                      value={obs}
+                      onChange={e=>setObs(e.target.value)}
+                    />
+                  </div>
+
+                  {erro && (
+                    <div style={{background:'#FCEBEB',borderRadius:12,padding:'12px 16px',marginBottom:12,fontSize:14,color:'#A32D2D',fontWeight:600,display:'flex',gap:8,alignItems:'center'}}>
+                      ⚠️ {erro}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Botões de navegação ── */}
+              <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:8}}>
+                {/* Botão primário */}
+                {etapa === 1 && (
+                  <CTA label="Próximo →"
+                    onClick={()=>irPara(2)}
+                    disabled={!servico||(servico?.id==='outro'&&!servicoCustom)}
+                  />
+                )}
+                {etapa === 2 && (
+                  <CTA label="Ver horários →" onClick={()=>irPara(3)} disabled={!dataSel} />
+                )}
+                {etapa === 3 && (
+                  <CTA label="Continuar →" onClick={()=>irPara(4)} disabled={!horaSel||loadingSlots} />
+                )}
+                {etapa === 4 && (
+                  <CTA
+                    label={salvando ? '⏳ Agendando...' : '✓ Confirmar agendamento'}
+                    onClick={confirmar}
+                    disabled={salvando}
+                  />
+                )}
+
+                {/* Botão voltar */}
+                {etapa > 1 && (
+                  <CTA label="← Voltar" onClick={()=>irPara(etapa-1)} secondary />
+                )}
+              </div>
+
+              <div style={{textAlign:'center',marginTop:24,fontSize:11,color:'#C9C7D4'}}>Powered by ✂️ BeatSalon</div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
