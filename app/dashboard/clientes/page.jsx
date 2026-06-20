@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
 import Link from 'next/link'
-import { Users, Plus, Search, MessageSquare, Phone, Edit, Trash, ChevronRight, AlertCircle } from '../../../lib/icons'
+import { Users, Plus, Search, MessageSquare, Phone, Edit, Trash, ChevronRight, AlertCircle, Calendar } from '../../../lib/icons'
 
 const STATUS_CFG = {
   ativo:    { bg:'var(--success-light)', color:'var(--success)',  label:'Ativo' },
