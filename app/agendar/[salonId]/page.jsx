@@ -234,7 +234,7 @@ export default function AgendarPage({ params }) {
   /* Carrega salão, serviços e datas bloqueadas */
   useEffect(() => {
     Promise.all([
-      sb.from('salons').select('id,name,phone,address,city,description,logo_url').eq('id',salonId).single(),
+      sb.from('salons').select('*').eq('id',salonId).single(),
       sb.from('services').select('id,name,price,duration,category').eq('salon_id',salonId).eq('active',true).order('name'),
       sb.from('blocked_dates').select('date').eq('salon_id',salonId),
     ]).then(([{data:s,error:e},{data:sv},{data:bl}]) => {
