@@ -368,7 +368,7 @@ export default function AgendaPage() {
   return (
     <div className="pg">
       <div style={{ marginBottom: 20 }}>
-        <div className="pg-h1">📅 Agenda</div>
+        <div className="pg-h1">Agenda</div>
         <div className="pg-sub">Agendamentos e compromissos · {salon?.name || 'BeatSalon'}</div>
       </div>
 
