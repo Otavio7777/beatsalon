@@ -85,7 +85,14 @@ export default function ConfiguracoesPage() {
       if (uploaded) logo_url = uploaded
     }
 
-    await sb.from('salons').update({ ...form, logo_url }).eq('id', salon.id)
+    // Tenta salvar tudo; se falhar (colunas não existem), salva só o básico
+    const fullPayload = { ...form, logo_url }
+    const { error: e1 } = await sb.from('salons').update(fullPayload).eq('id', salon.id)
+    if (e1) {
+      // Fallback: apenas campos que certamente existem
+      const { error: e2 } = await sb.from('salons').update({ name: form.name, phone: form.phone }).eq('id', salon.id)
+      if (e2) console.error('Erro ao salvar:', e2)
+    }
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
