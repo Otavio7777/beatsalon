@@ -138,7 +138,7 @@ export default function ServicosPage() {
   return (
     <div className="pg">
       <div className="pg-hd">
-        <div style={{fontSize:22,fontWeight:800,color:'#1A1825'}}>✂️ Serviços</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#1A1825'}}>Serviços</div>
         <div style={{fontSize:12,color:'#8A87A0',marginTop:3}}>Catálogo de serviços · {salon?.name}</div>
       </div>
 
