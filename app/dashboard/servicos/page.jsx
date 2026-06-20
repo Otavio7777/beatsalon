@@ -4,16 +4,16 @@ import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
 
 const CATEGORIAS = [
-  {id:'cabelo',   icon:'✂️',  label:'Cabelo'},
-  {id:'barba',    icon:'🪒',  label:'Barba'},
-  {id:'coloracao',icon:'🎨',  label:'Coloração'},
-  {id:'estetica', icon:'💆',  label:'Estética'},
-  {id:'unhas',    icon:'💅',  label:'Unhas'},
-  {id:'sobrancelha',icon:'✨',label:'Sobrancelha'},
-  {id:'massagem', icon:'💆',  label:'Massagem'},
-  {id:'geral',    icon:'📋',  label:'Geral'},
+  {id:'cabelo',   label:'Cabelo'},
+  {id:'barba',    label:'Barba'},
+  {id:'coloracao',label:'Coloração'},
+  {id:'estetica', label:'Estética'},
+  {id:'unhas',    label:'Unhas'},
+  {id:'sobrancelha',label:'Sobrancelha'},
+  {id:'massagem', label:'Massagem'},
+  {id:'geral',    label:'Geral'},
 ]
-const catIcon = (c) => CATEGORIAS.find(x=>x.id===c)?.icon || '📋'
+const catIcon = (c) => ''
 const catLabel = (c) => CATEGORIAS.find(x=>x.id===c)?.label || c
 
 function ServicoModal({ salonId, servico, onClose, onSaved }) {
@@ -52,7 +52,7 @@ function ServicoModal({ salonId, servico, onClose, onSaved }) {
               background:form.category===c.id?'#534AB7':'#fff',cursor:'pointer',textAlign:'center',
               color:form.category===c.id?'#fff':'#8A87A0',fontSize:11,fontWeight:600,
             }}>
-              <div style={{fontSize:18,marginBottom:2}}>{c.icon}</div>
+              
               {c.label}
             </button>
           ))}
@@ -160,7 +160,7 @@ export default function ServicosPage() {
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:16}}>
         {['todos',...CATEGORIAS.map(c=>c.id)].map(c=>(
           <button key={c} onClick={()=>setCatFilter(c)} className={`filter-btn${catFilter===c?' active':''}`}>
-            {c==='todos'?'Todos':`${catIcon(c)} ${catLabel(c)}`}
+            {c==='todos'?'Todos':catLabel(c)}
           </button>
         ))}
       </div>
@@ -176,7 +176,7 @@ export default function ServicosPage() {
           {filtered.map(svc=>(
             <div key={svc.id} style={{background:'#fff',borderRadius:14,padding:'14px 16px',border:'1px solid #E3E1F0',display:'flex',alignItems:'center',gap:12,opacity:svc.active?1:.6}}>
               <div style={{width:44,height:44,borderRadius:12,background:'#F2F1F8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>
-                {catIcon(svc.category)}
+                
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
