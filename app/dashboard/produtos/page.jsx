@@ -159,7 +159,7 @@ export default function ProdutosPage() {
   return (
     <div className="pg">
       <div style={{marginBottom:20}}>
-        <div className="pg-h1">📦 Produtos</div>
+        <div className="pg-h1">Produtos</div>
         <div className="pg-sub">Estoque e catálogo · {salon?.name || 'BeatSalon'}</div>
       </div>
 
