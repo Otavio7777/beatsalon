@@ -39,7 +39,7 @@ function BlockDateModal({ salonId, onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box" style={{maxWidth:360}}>
-        <div style={{fontSize:16,fontWeight:800,marginBottom:16}}>🚫 Bloquear data</div>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:16}}>Bloquear data</div>
         <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',display:'block',marginBottom:6}}>Data</label>
         <input type="date" value={date} onChange={e=>setDate(e.target.value)}
           style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid #E3E1F0',fontSize:14,outline:'none',marginBottom:12,boxSizing:'border-box'}} />
@@ -134,7 +134,7 @@ export default function HorariosPage() {
   return (
     <div className="pg">
       <div className="pg-hd">
-        <div style={{fontSize:22,fontWeight:800,color:'#1A1825'}}>🕐 Gestão de Horários</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#1A1825'}}>Gestão de Horários</div>
         <div style={{fontSize:12,color:'#8A87A0',marginTop:3}}>Configure sua disponibilidade · {salon?.name}</div>
       </div>
 
@@ -150,7 +150,7 @@ export default function HorariosPage() {
         <button className="btn-secondary" onClick={()=>toggleAll(true)}>Abrir todos os dias</button>
         <button className="btn-secondary" onClick={()=>toggleAll(false)}>Fechar todos os dias</button>
         <button onClick={()=>setShowBlockModal(true)} style={{padding:'8px 14px',background:'#FCEBEB',color:'#A32D2D',border:'1px solid #F5C4B3',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer'}}>
-          🚫 Bloquear data
+          Bloquear data
         </button>
       </div>
 
@@ -204,7 +204,7 @@ export default function HorariosPage() {
       <div style={{background:'#fff',borderRadius:16,border:'1px solid #E3E1F0',padding:'16px 20px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div>
-            <div style={{fontSize:15,fontWeight:800}}>🚫 Datas bloqueadas</div>
+            <div style={{fontSize:15,fontWeight:800}}>Datas bloqueadas</div>
             <div style={{fontSize:12,color:'#8A87A0',marginTop:2}}>Dias sem atendimento no link público</div>
           </div>
           <button onClick={()=>setShowBlockModal(true)} className="btn-primary" style={{fontSize:12,padding:'7px 14px'}}>＋ Bloquear</button>
