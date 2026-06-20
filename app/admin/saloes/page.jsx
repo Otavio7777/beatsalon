@@ -1,3 +1,2 @@
-'use client'
 import { redirect } from 'next/navigation'
-export default function SaloesPage() { redirect('/admin') }
+export default function () { redirect('/admin/contratos') }
