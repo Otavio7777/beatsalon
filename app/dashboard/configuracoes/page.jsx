@@ -68,12 +68,12 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="pg">
-      <div className="pg-h1">⚙️ Configurações</div>
+      <div className="pg-h1">Configurações</div>
       <div className="pg-sub">Gerencie seu salão e link de agendamento · {salon?.name}</div>
 
       {/* Link de agendamento */}
       <div style={st.card}>
-        <div style={st.cardHd}>🔗 Link de agendamento público</div>
+        <div style={st.cardHd}>Link de agendamento público</div>
         <div style={st.cardSb}>Compartilhe este link com seus clientes para que eles agendem diretamente, sem precisar de login.</div>
 
         {bookingLink ? (
@@ -106,7 +106,7 @@ export default function ConfiguracoesPage() {
 
       {/* Configurações do horário */}
       <div style={st.card}>
-        <div style={st.cardHd}>🕐 Horários disponíveis</div>
+        <div style={st.cardHd}>Horários disponíveis</div>
         <div style={st.cardSb}>Configuração atual dos slots de agendamento online.</div>
         <div style={st.infoRow}>
           <span style={st.infoLbl}>Horário de funcionamento</span>
@@ -132,7 +132,7 @@ export default function ConfiguracoesPage() {
       {/* Dados do salão */}
       <div style={st.card}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
-          <div style={st.cardHd}>🏪 Dados do salão</div>
+          <div style={st.cardHd}>Dados do salão</div>
           {!editando && <button style={st.editBtn} onClick={() => setEditando(true)}>Editar</button>}
         </div>
         <div style={st.cardSb}>Informações exibidas na página de agendamento público.</div>
@@ -161,7 +161,7 @@ export default function ConfiguracoesPage() {
 
       {/* ID do salão */}
       <div style={st.card}>
-        <div style={st.cardHd}>ℹ️ Informações técnicas</div>
+        <div style={st.cardHd}>Informações técnicas</div>
         <div style={st.cardSb}>Dados para integração e suporte.</div>
         <div style={st.infoRow}><span style={st.infoLbl}>ID do salão</span><span style={{...st.infoVal, fontSize:11, color:'#8A87A0', fontFamily:'monospace'}}>{salon?.id}</span></div>
         <div style={{...st.infoRow, borderBottom:'none'}}><span style={st.infoLbl}>Proprietário</span><span style={st.infoVal}>{user?.email}</span></div>
