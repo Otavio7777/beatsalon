@@ -190,7 +190,7 @@ export default function ProdutosPage() {
               background: catFilter===cat ? '#534AB7' : '#fff',
               color: catFilter===cat ? '#fff' : '#8A87A0',
               borderColor: catFilter===cat ? '#534AB7' : '#E3E1F0',
-            }}>{cat==='todos' ? 'Todos' : `${CAT_ICONS[cat]} ${CAT_LABELS[cat]}`}</button>
+            }}>{cat==='todos' ? 'Todos' : ` ${CAT_LABELS[cat]}`}</button>
           ))}
         </div>
         <button style={st.addBtn} onClick={() => { setEditProd(null); setShowModal(true) }}>＋ Produto</button>
@@ -227,7 +227,7 @@ export default function ProdutosPage() {
                     <div style={{fontWeight:700}}>{p.name}</div>
                     {p.code && <div style={{fontSize:11,color:'#8A87A0'}}>{p.code}</div>}
                   </td>
-                  <td style={st.td}><span style={{fontSize:13}}>{CAT_ICONS[p.category]||'📦'} {CAT_LABELS[p.category]||p.category}</span></td>
+                  <td style={st.td}><span style={{fontSize:13}}>{''} {CAT_LABELS[p.category]||p.category}</span></td>
                   <td style={{...st.td,fontWeight:700,color:'#1D9E75'}}>{p.price ? `R$${Number(p.price).toLocaleString('pt-BR')}` : '—'}</td>
                   <td style={{...st.td,color:'#8A87A0'}}>{p.cost ? `R$${Number(p.cost).toLocaleString('pt-BR')}` : '—'}</td>
                   <td style={st.td}><span style={{fontWeight:700,color: margem(p)>30 ? '#1D9E75' : '#D85A30'}}>{p.price>0 ? `${margem(p)}%` : '—'}</span></td>
