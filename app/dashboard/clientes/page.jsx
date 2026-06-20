@@ -244,7 +244,7 @@ export default function ClientesPage() {
     <div className="pg">
       {/* Cabeçalho */}
       <div style={st.hd}>
-        <div className="pg-h1">👥 Clientes — CRM</div>
+        <div className="pg-h1">Clientes — CRM</div>
         <div className="pg-sub">Gestão de relacionamento · {salon?.name || 'BeatSalon'}</div>
       </div>
 
