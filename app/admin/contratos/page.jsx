@@ -86,8 +86,6 @@ export default function ContratosPage() {
 
   return (
     <div>
-      <div style={st.h1}>Gestão de Contratos</div>
-      <div style={st.sub}>Clientes da plataforma Meu Salão by Whatsale</div>
 
       <div style={st.grid}>
         <div style={st.kpi}><div style={st.kl}>Total de contratos</div><div style={st.kv}>{contratos.length}</div></div>
