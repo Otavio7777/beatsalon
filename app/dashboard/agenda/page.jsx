@@ -2,267 +2,222 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
+import { Calendar, Plus, Check, Edit, Trash, MessageSquare, Phone } from '../../../lib/icons'
 
-const STATUS_CFG = {
-  agendado:  { bg:'#E6F1FB', color:'#0C447C', label:'Agendado' },
-  concluido: { bg:'#E1F5EE', color:'#085041', label:'Concluído' },
-  cancelado: { bg:'#FCF0F0', color:'#A32D2D', label:'Cancelado' },
-  faltou:    { bg:'#FAEEDA', color:'#633806', label:'Faltou' },
-}
-const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+const DIAS  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+const MS    = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
-function today() {
-  const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+const STATUS = {
+  agendado:  {bg:'var(--navy-100)',color:'var(--navy-700)',label:'Agendado'},
+  concluido: {bg:'var(--success-light)',color:'var(--success)',label:'Concluído'},
+  cancelado: {bg:'var(--danger-light)',color:'var(--danger)',label:'Cancelado'},
+  faltou:    {bg:'var(--warning-light)',color:'var(--warning)',label:'Faltou'},
 }
 
-/* ---------- Modal de agendamento com busca de cliente ---------- */
-function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
+function today() { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()) }
+function fmtHM(iso) { return iso?.slice(11,16)||'' }
+
+/* Gera links WhatsApp */
+function waLink(phone, msg) {
+  if (!phone) return null
+  const num = `55${phone.replace(/\D/g,'')}`
+  return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`
+}
+
+function waLembrete(appt, salonName) {
+  const dt = new Date(appt.date)
+  const dia = `${dt.getDate()}/${dt.getMonth()+1}`
+  const hr  = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+  return `Olá ${appt.client_name?.split(' ')[0]}! 👋 Lembrando que você tem *${appt.service_name||'horário'}* amanhã, *${dia} às ${hr}*, em *${salonName}*. Confirme sua presença! 😊`
+}
+
+function waConfirmar(appt, salonName) {
+  const dt = new Date(appt.date)
+  const dia = `${dt.getDate()}/${dt.getMonth()+1}`
+  const hr  = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+  return `Olá ${appt.client_name?.split(' ')[0]}! ✂️ Confirmando seu agendamento: *${appt.service_name||'atendimento'}* em *${dia} às ${hr}* aqui no *${salonName}*. Te esperamos!`
+}
+
+function waObrigado(appt, salonName) {
+  return `Olá ${appt.client_name?.split(' ')[0]}! 🌟 Foi um prazer atendê-lo(a) hoje com *${appt.service_name||'nosso serviço'}* aqui no *${salonName}*. Ficou satisfeito? Avalie e volte sempre! 😊`
+}
+
+function waRemarcar(appt, salonName) {
+  return `Olá ${appt.client_name?.split(' ')[0]}! Sentimos sua falta no agendamento de hoje em *${salonName}*. Que tal remarcarmos? Escolha um horário que funcione para você! 📅`
+}
+
+/* ── Modal de agendamento ── */
+function AgModal({ salonId, appt, onClose, onSaved }) {
   const [form, setForm] = useState({
-    client_name: '', client_id: null, client_phone: '', service_name: '', date: '',
-    value: '', status: 'agendado', notes: '', ...appt,
+    client_name:'', client_id:null, client_phone:'', service_name:'', date:'',
+    value:'', status:'agendado', notes:'', ...appt,
   })
-  const [clientSearch, setClientSearch] = useState(appt?.client_name || '')
-  const [clients, setClients] = useState([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [crmMsg, setCrmMsg] = useState(null) // { type:'new'|'linked', name }
-  const searchRef = useRef(null)
+  const [clientSearch, setClientSearch] = useState(appt?.client_name||'')
+  const [clients,  setClients]   = useState([])
+  const [services, setServices]  = useState([])
+  const [showDrop, setShowDrop]  = useState(false)
+  const [saving,   setSaving]    = useState(false)
+  const [crmMsg,   setCrmMsg]    = useState(null)
   const sb = createClient()
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
-  useEffect(() => {
-    const fetchClients = async () => {
-      const { data } = await sb.from('clients').select('id, name, phone, main_service').eq('salon_id', salonId).order('name')
-      setClients(data || [])
-    }
-    fetchClients()
-  }, [salonId])
+  useEffect(()=>{
+    Promise.all([
+      sb.from('clients').select('id,name,phone,main_service').eq('salon_id',salonId).order('name'),
+      sb.from('services').select('id,name,price').eq('salon_id',salonId).eq('active',true).order('name'),
+    ]).then(([{data:cl},{data:sv}])=>{ setClients(cl||[]); setServices(sv||[]) })
+  },[salonId])
 
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    (c.phone || '').includes(clientSearch)
+  const filtered = clients.filter(c=>
+    c.name.toLowerCase().includes(clientSearch.toLowerCase())||
+    (c.phone||'').includes(clientSearch)
   )
 
-  const selectClient = (client) => {
-    setClientSearch(client.name)
-    set('client_name', client.name)
-    set('client_id', client.id)
-    set('client_phone', client.phone || '')
-    if (!form.service_name && client.main_service) set('service_name', client.main_service)
-    setShowDropdown(false)
+  const selClient = (c) => {
+    setClientSearch(c.name); set('client_name',c.name); set('client_id',c.id)
+    set('client_phone',c.phone||'')
+    if (!form.service_name && c.main_service) set('service_name',c.main_service)
+    setShowDrop(false)
   }
 
-  const clearClient = () => {
-    setClientSearch(''); set('client_name', ''); set('client_id', null); set('client_phone', '')
-  }
+  const clearClient = () => { setClientSearch(''); set('client_name',''); set('client_id',null); set('client_phone','') }
 
-  /* Atualiza stats do cliente quando concluido */
-  const updateClientStats = async (clientId, appointmentDate, value, previousStatus) => {
-    if (!clientId || previousStatus === 'concluido') return
-    const date = appointmentDate?.slice(0, 10) || new Date().toISOString().slice(0, 10)
-    const { data: cur } = await sb.from('clients').select('visit_count, ltv').eq('id', clientId).single()
+  const updateStats = async (cid, date, value, prevStatus) => {
+    if (!cid||prevStatus==='concluido') return
+    const {data:cur} = await sb.from('clients').select('visit_count,ltv').eq('id',cid).single()
     if (!cur) return
     await sb.from('clients').update({
-      visit_count: (cur.visit_count || 0) + 1,
-      ltv: (cur.ltv || 0) + (Number(value) || 0),
-      last_visit: date, status: 'ativo',
-    }).eq('id', clientId)
+      visit_count:(cur.visit_count||0)+1, ltv:(cur.ltv||0)+(Number(value)||0),
+      last_visit:date?.slice(0,10), status:'ativo',
+    }).eq('id',cid)
   }
 
-  /* Auto-vincula ou cria cliente pelo celular */
-  const autoVincularCelular = async (phone) => {
-    if (!phone || form.client_id) return null
-    const digits = phone.replace(/\D/g, '')
-    if (digits.length < 8) return null
-
-    // Tenta RPC match_or_create_client
-    const { data, error } = await sb.rpc('match_or_create_client', {
-      p_salon_id:    salonId,
-      p_client_name: form.client_name || 'Cliente',
-      p_client_phone: digits,
+  const autoVincular = async (phone) => {
+    if (!phone||form.client_id) return null
+    const digits = phone.replace(/\D/g,'')
+    if (digits.length<8) return null
+    const {data,error} = await sb.rpc('match_or_create_client',{
+      p_salon_id:salonId, p_client_name:form.client_name||'Cliente', p_client_phone:digits
     })
-
-    if (!error && data?.client_id) {
-      return { clientId: data.client_id, clientName: data.client_name, isNew: data.is_new }
-    }
-
-    // Fallback: busca manual por telefone nos clientes já carregados
-    const normalized = digits
-    const found = clients.find(c => (c.phone || '').replace(/\D/g,'') === normalized)
-    if (found) return { clientId: found.id, clientName: found.name, isNew: false }
-
+    if (!error&&data?.client_id) return data
+    const found = clients.find(c=>(c.phone||'').replace(/\D/g,'')=== digits)
+    if (found) return {client_id:found.id, client_name:found.name, is_new:false}
     return null
   }
 
   const save = async () => {
-    if (!form.client_name || !form.date) return
-    setSaving(true)
-    setCrmMsg(null)
-
-    let finalClientId = form.client_id || null
-    let crmResult = null
-
-    // Auto-vincula pelo celular se não selecionou do CRM
-    if (!finalClientId && form.client_phone) {
-      crmResult = await autoVincularCelular(form.client_phone)
-      if (crmResult) finalClientId = crmResult.clientId
-    }
-
-    const payload = {
-      client_name:  form.client_name,
-      client_id:    finalClientId,
-      service_name: form.service_name,
-      date:         form.date,
-      value:        Number(form.value) || 0,
-      status:       form.status,
-      notes:        form.notes,
-      salon_id:     salonId,
-    }
-
+    if (!form.client_name||!form.date) return
+    setSaving(true); setCrmMsg(null)
+    let cid = form.client_id||null, crmRes = null
+    if (!cid&&form.client_phone) { crmRes = await autoVincular(form.client_phone); if(crmRes) cid=crmRes.client_id }
+    const payload = {client_name:form.client_name,client_id:cid,service_name:form.service_name,
+      date:form.date,value:Number(form.value)||0,status:form.status,notes:form.notes,salon_id:salonId}
     if (appt?.id) {
-      const { error } = await sb.from('appointments').update(payload).eq('id', appt.id)
-      if (!error && form.status === 'concluido' && finalClientId) {
-        await updateClientStats(finalClientId, form.date, form.value, appt.status)
-      }
+      await sb.from('appointments').update(payload).eq('id',appt.id)
+      if (form.status==='concluido'&&cid) await updateStats(cid,form.date,form.value,appt.status)
     } else {
-      const { error } = await sb.from('appointments').insert(payload)
-      if (!error && form.status === 'concluido' && finalClientId) {
-        await updateClientStats(finalClientId, form.date, form.value, null)
-      }
+      await sb.from('appointments').insert(payload)
+      if (form.status==='concluido'&&cid) await updateStats(cid,form.date,form.value,null)
     }
-
     onSaved()
-
-    if (crmResult) {
-      setCrmMsg({ type: crmResult.isNew ? 'new' : 'linked', name: crmResult.clientName })
-      setTimeout(() => { onClose() }, 2200)
-    } else {
-      onClose()
-    }
-
+    if (crmRes) { setCrmMsg({type:crmRes.is_new?'new':'linked',name:crmRes.client_name}); setTimeout(onClose,2000) }
+    else onClose()
     setSaving(false)
   }
 
-  const s = {
-    overlay: 'REPLACED_OVERLAY',
-    box:    { background:'#fff',borderRadius:20,padding:'28px',width:'100%',maxWidth:460,maxHeight:'90vh',overflowY:'auto' },
-    hd:     { fontSize:18,fontWeight:800,marginBottom:18 },
-    label:  { fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:5,display:'block',marginTop:12 },
-    input:  { width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E3E1F0',fontSize:13,outline:'none',color:'#1A1825',boxSizing:'border-box' },
-    select: { width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E3E1F0',fontSize:13,outline:'none',background:'#fff',color:'#1A1825' },
-    grid2:  { display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 },
-    foot:   { display:'flex',gap:10,justifyContent:'flex-end',marginTop:20,paddingTop:16,borderTop:'1px solid #E3E1F0' },
-    drop:   { position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #E3E1F0',borderRadius:9,boxShadow:'0 4px 16px rgba(0,0,0,.1)',zIndex:100,maxHeight:180,overflowY:'auto',marginTop:2 },
-    dropItem:{ padding:'9px 14px',cursor:'pointer',fontSize:13,borderBottom:'1px solid #F2F1F8' },
-    clientBox:{ position:'relative' },
-    selectedClient:{ display:'flex',alignItems:'center',gap:8,padding:'9px 12px',borderRadius:9,border:'1px solid #534AB7',background:'#EEEDFE',fontSize:13,fontWeight:600,color:'#534AB7' },
-  }
+  const iS = {border:'1px solid var(--border)',borderRadius:'var(--radius)',padding:'9px 13px',fontSize:13,outline:'none',width:'100%',boxSizing:'border-box',background:'var(--white)',color:'var(--text)'}
+  const lS = {display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:5,marginTop:12}
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box">
-        {/* Feedback de vinculação CRM */}
         {crmMsg && (
-          <div style={{
-            background: crmMsg.type==='new' ? '#E1F5EE' : '#EEEDFE',
-            borderRadius:10, padding:'10px 14px', marginBottom:14,
-            fontSize:13, fontWeight:600,
-            color: crmMsg.type==='new' ? '#085041' : '#534AB7',
-            display:'flex', alignItems:'center', gap:8,
-          }}>
-            {crmMsg.type==='new' ? '✨ Novo cliente criado no CRM:' : '🔗 Vinculado ao cadastro de'} <strong>{crmMsg.name}</strong>
+          <div style={{background:crmMsg.type==='new'?'var(--success-light)':'var(--navy-100)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,fontWeight:600,color:crmMsg.type==='new'?'var(--success)':'var(--navy-700)',display:'flex',gap:8}}>
+            {crmMsg.type==='new'?'✨ Novo cliente criado:':'🔗 Vinculado a:'} <strong>{crmMsg.name}</strong>
           </div>
         )}
+        <div className="modal-title">{appt?.id?'Editar':'Novo'} agendamento</div>
 
-        <div style={s.hd}>{appt?.id ? 'Editar agendamento' : 'Novo agendamento'}</div>
-
-        {/* Busca de cliente */}
-        <label style={s.label}>Cliente * <span style={{color:'#534AB7',fontWeight:400,textTransform:'none'}}>(selecione do CRM ou digite)</span></label>
+        {/* Busca cliente */}
+        <label style={lS}>Cliente * <span style={{color:'var(--navy-500)',fontWeight:400,textTransform:'none'}}>— busque ou digite</span></label>
         {form.client_id ? (
-          <div style={s.selectedClient}>
-            <span>👤 {form.client_name}</span>
-            <span style={{marginLeft:'auto',cursor:'pointer',color:'#8A87A0',fontSize:16}} onClick={clearClient}>✕</span>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 13px',borderRadius:'var(--radius)',border:'2px solid var(--navy-400)',background:'var(--navy-50)'}}>
+            <span style={{fontWeight:700,color:'var(--navy-700)',flex:1,fontSize:13}}>👤 {form.client_name}</span>
+            <span style={{cursor:'pointer',color:'var(--muted)',fontSize:16}} onClick={clearClient}>✕</span>
           </div>
         ) : (
-          <div style={s.clientBox} ref={searchRef}>
-            <input
-              style={s.input}
-              value={clientSearch}
-              onChange={e => { setClientSearch(e.target.value); set('client_name', e.target.value); setShowDropdown(true) }}
-              onFocus={() => setShowDropdown(true)}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-              placeholder="Buscar cliente ou digitar nome..."
-            />
-            {showDropdown && clientSearch.length > 0 && filtered.length > 0 && (
-              <div style={s.drop}>
-                {filtered.map(c => (
-                  <div key={c.id} style={s.dropItem}
-                    onMouseDown={() => selectClient(c)}>
+          <div style={{position:'relative'}}>
+            <input style={iS} value={clientSearch}
+              onChange={e=>{setClientSearch(e.target.value);set('client_name',e.target.value);setShowDrop(true)}}
+              onFocus={()=>setShowDrop(true)} onBlur={()=>setTimeout(()=>setShowDrop(false),150)}
+              placeholder="Buscar cliente ou digitar nome..." />
+            {showDrop&&clientSearch.length>0&&filtered.length>0 && (
+              <div style={{position:'absolute',top:'100%',left:0,right:0,background:'var(--white)',border:'1px solid var(--border)',borderRadius:'var(--radius)',boxShadow:'0 4px 16px rgba(0,0,0,.1)',zIndex:100,maxHeight:180,overflowY:'auto',marginTop:2}}>
+                {filtered.map(c=>(
+                  <div key={c.id} onMouseDown={()=>selClient(c)} style={{padding:'9px 14px',cursor:'pointer',fontSize:13,borderBottom:'1px solid var(--gray-100)'}}>
                     <span style={{fontWeight:600}}>{c.name}</span>
-                    {c.phone && <span style={{color:'#8A87A0',marginLeft:8,fontSize:11}}>{c.phone}</span>}
-                    {c.main_service && <span style={{color:'#534AB7',marginLeft:8,fontSize:11}}>· {c.main_service}</span>}
+                    {c.phone&&<span style={{color:'var(--muted)',marginLeft:8,fontSize:11}}>{c.phone}</span>}
+                    {c.main_service&&<span style={{color:'var(--navy-500)',marginLeft:8,fontSize:11}}>· {c.main_service}</span>}
                   </div>
                 ))}
-                {filtered.length === 0 && clientSearch && (
-                  <div style={{...s.dropItem,color:'#8A87A0'}}>Usar "{clientSearch}" como novo cliente</div>
-                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Campo celular quando cliente não está vinculado ao CRM */}
+        {/* Celular (se não vinculado) */}
         {!form.client_id && (
-          <div style={{marginBottom:4}}>
-            <label style={s.label}>
-              Celular <span style={{fontWeight:400,textTransform:'none',color:'#534AB7'}}>(auto-vincula ao CRM 🔗)</span>
-            </label>
-            <input
-              style={s.input}
-              placeholder="(00) 00000-0000"
-              value={form.client_phone || ''}
-              onChange={e => set('client_phone', e.target.value)}
-              inputMode="tel"
-            />
+          <div>
+            <label style={lS}>WhatsApp <span style={{color:'var(--navy-500)',fontWeight:400,textTransform:'none'}}>— auto-vincula ao CRM 🔗</span></label>
+            <input style={iS} placeholder="(00) 00000-0000" value={form.client_phone||''} onChange={e=>set('client_phone',e.target.value)} inputMode="tel" />
           </div>
         )}
 
-        <div style={s.grid2}>
+        {/* Serviço */}
+        <label style={lS}>Serviço</label>
+        {services.length>0 ? (
+          <select style={{...iS}} value={form.service_name} onChange={e=>set('service_name',e.target.value)}>
+            <option value="">Selecione ou personalize</option>
+            {services.map(s=><option key={s.id} value={s.name}>{s.name}{s.price>0?` — R$${Number(s.price).toLocaleString('pt-BR')}`:''}</option>)}
+            <option value="__custom">Outro...</option>
+          </select>
+        ) : (
+          <input style={iS} value={form.service_name} onChange={e=>set('service_name',e.target.value)} placeholder="Corte, Barba..." />
+        )}
+        {form.service_name==='__custom' && (
+          <input style={{...iS,marginTop:6}} placeholder="Descreva o serviço..." onChange={e=>set('service_name',e.target.value)} autoFocus />
+        )}
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div>
-            <label style={s.label}>Serviço</label>
-            <input style={s.input} value={form.service_name} onChange={e => set('service_name', e.target.value)} placeholder="Corte, Barba..." />
+            <label style={lS}>Valor (R$)</label>
+            <input style={iS} type="number" value={form.value} onChange={e=>set('value',e.target.value)} placeholder="0" />
           </div>
           <div>
-            <label style={s.label}>Valor (R$)</label>
-            <input style={s.input} type="number" value={form.value} onChange={e => set('value', e.target.value)} placeholder="0" />
-          </div>
-          <div style={{gridColumn:'1/-1'}}>
-            <label style={s.label}>Data e horário *</label>
-            <input style={s.input} type="datetime-local" value={form.date} onChange={e => set('date', e.target.value)} />
-          </div>
-          <div>
-            <label style={s.label}>Status</label>
-            <select style={s.select} value={form.status} onChange={e => set('status', e.target.value)}>
-              {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            <label style={lS}>Status</label>
+            <select style={{...iS}} value={form.status} onChange={e=>set('status',e.target.value)}>
+              {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
             </select>
-          </div>
-          <div>
-            <label style={s.label}>Observações</label>
-            <input style={s.input} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Opcional" />
           </div>
         </div>
 
-        {form.client_id && form.status === 'concluido' && (
-          <div style={{background:'#E1F5EE',borderRadius:9,padding:'10px 14px',marginTop:14,fontSize:12,color:'#085041',fontWeight:600}}>
-            ✅ Ao salvar, o histórico do cliente será atualizado automaticamente (visitas e LTV).
+        <label style={lS}>Data e horário *</label>
+        <input style={iS} type="datetime-local" value={form.date} onChange={e=>set('date',e.target.value)} />
+
+        <label style={lS}>Observações</label>
+        <input style={iS} value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Opcional" />
+
+        {form.client_id&&form.status==='concluido' && (
+          <div style={{background:'var(--success-light)',borderRadius:8,padding:'9px 13px',marginTop:12,fontSize:12,color:'var(--success)',fontWeight:600}}>
+            Ao salvar, histórico do cliente será atualizado automaticamente.
           </div>
         )}
 
-        <div style={s.foot}>
-          <button onClick={onClose} style={{padding:'8px 18px',borderRadius:9,border:'1px solid #E3E1F0',background:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',color:'#8A87A0'}}>Cancelar</button>
-          <button onClick={save} disabled={saving} style={{padding:'8px 20px',borderRadius:9,border:'none',background:'#534AB7',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
-            {saving ? 'Salvando...' : 'Salvar'}
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn-secondary">Cancelar</button>
+          <button onClick={save} disabled={saving} className="btn-primary">
+            {saving?'Salvando...':'Salvar'}
           </button>
         </div>
       </div>
@@ -270,154 +225,188 @@ function AgendamentoModal({ salonId, appt, onClose, onSaved }) {
   )
 }
 
-/* ---------- Página principal ---------- */
+/* ── Painel WhatsApp de appointment ── */
+function WaPanel({ appt, salon, onRefresh }) {
+  const [open, setOpen] = useState(false)
+  const phone = appt.notes?.match(/^\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}/)?.[0] || ''
+
+  if (!phone && !appt.client_phone) return null
+
+  const fone = phone || appt.client_phone
+  const msgs = [
+    { label:'Lembrete 24h', icon:'🔔', href: waLink(fone, waLembrete(appt, salon?.name)), cond: appt.status==='agendado' },
+    { label:'Confirmar',    icon:'✅', href: waLink(fone, waConfirmar(appt, salon?.name)), cond: appt.status==='agendado' },
+    { label:'Obrigado',     icon:'🙏', href: waLink(fone, waObrigado(appt, salon?.name)),  cond: appt.status==='concluido' },
+    { label:'Remarcar',     icon:'📅', href: waLink(fone, waRemarcar(appt, salon?.name)),  cond: appt.status==='faltou'||appt.status==='cancelado' },
+  ].filter(m=>m.cond)
+
+  if (msgs.length===0) return null
+
+  return (
+    <div style={{position:'relative'}}>
+      <button onClick={()=>setOpen(o=>!o)} title="Ações WhatsApp"
+        style={{padding:'4px 8px',borderRadius:6,border:'1px solid #D1FAE5',background:'#ECFDF5',color:'#059669',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+        <MessageSquare size={11} color="#059669" /> WA
+      </button>
+      {open && (
+        <>
+          <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,zIndex:49}}/>
+          <div style={{position:'absolute',right:0,top:'110%',background:'var(--white)',border:'1px solid var(--border)',borderRadius:10,boxShadow:'0 4px 16px rgba(0,0,0,.12)',zIndex:50,minWidth:160,padding:6}}>
+            {msgs.map(m=>(
+              <a key={m.label} href={m.href} target="_blank" rel="noreferrer"
+                style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:6,textDecoration:'none',color:'var(--text)',fontSize:12,fontWeight:600}}
+                onClick={()=>setOpen(false)}>
+                <span>{m.icon}</span> {m.label}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── Página principal ── */
 export default function AgendaPage() {
-  const { salon, user, loading: salonLoading } = useSalon()
-  const [appts, setAppts]       = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [currentDate, setCurrentDate] = useState(today())
-  const [view, setView]         = useState('semana')
+  const { salon, user, loading:sl } = useSalon()
+  const [appts, setAppts]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [currDate, setCurrDate] = useState(()=>today())
+  const [view, setView]       = useState('semana')
   const [showModal, setShowModal] = useState(false)
-  const [editAppt, setEditAppt] = useState(null)
+  const [editAppt, setEditAppt]  = useState(null)
   const sb = createClient()
 
-  const fetchAppts = useCallback(async () => {
+  const load = useCallback(async()=>{
     if (!salon?.id) return
     setLoading(true)
-    const { data } = await sb.from('appointments').select('*').eq('salon_id', salon.id).order('date')
-    setAppts(data || [])
+    const {data} = await sb.from('appointments').select('*').eq('salon_id',salon.id).order('date')
+    setAppts(data||[])
     setLoading(false)
-  }, [salon?.id])
+  },[salon?.id])
 
-  useEffect(() => { fetchAppts() }, [fetchAppts])
-  useEffect(() => { if (!salonLoading && !user) window.location.href = '/login' }, [salonLoading, user])
+  useEffect(()=>{load()},[load])
+  useEffect(()=>{ if(!sl&&!user) window.location.href='/login' },[sl,user])
 
-  const del = async (id) => {
-    if (!confirm('Remover agendamento?')) return
-    await sb.from('appointments').delete().eq('id', id)
-    fetchAppts()
-  }
+  const del = async(id)=>{ if(!confirm('Remover?')) return; await sb.from('appointments').delete().eq('id',id); load() }
 
-  /* Marca como concluído rápido */
-  const quickConcluir = async (appt) => {
-    await sb.from('appointments').update({ status: 'concluido' }).eq('id', appt.id)
+  const quickConcluir = async(appt) => {
+    await sb.from('appointments').update({status:'concluido'}).eq('id',appt.id)
     if (appt.client_id) {
-      const date = appt.date?.slice(0, 10) || new Date().toISOString().slice(0, 10)
-      const { data: current } = await sb.from('clients').select('visit_count, ltv').eq('id', appt.client_id).single()
-      if (current) {
-        await sb.from('clients').update({
-          visit_count: (current.visit_count || 0) + 1,
-          ltv: (current.ltv || 0) + (Number(appt.value) || 0),
-          last_visit: date,
-          status: 'ativo',
-        }).eq('id', appt.client_id)
-      }
+      const {data:cur} = await sb.from('clients').select('visit_count,ltv').eq('id',appt.client_id).single()
+      if (cur) await sb.from('clients').update({visit_count:(cur.visit_count||0)+1,ltv:(cur.ltv||0)+(Number(appt.value)||0),last_visit:appt.date?.slice(0,10),status:'ativo'}).eq('id',appt.client_id)
     }
-    fetchAppts()
+    load()
   }
 
-  const weekStart = (d) => {
-    const day = d.getDay()
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
-  }
-  const weekDays = () => {
-    const start = weekStart(currentDate)
-    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
-  }
-  const apptsByDate = (date) => {
-    const ds = date.toISOString().slice(0, 10)
-    return appts.filter(a => a.date?.startsWith(ds)).sort((a, b) => a.date.localeCompare(b.date))
-  }
-  const isToday = (d) => d.toDateString() === today().toDateString()
+  const weekStart = d => { const day=d.getDay(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()-day) }
+  const weekDays  = () => { const s=weekStart(currDate); return Array.from({length:7},(_,i)=>new Date(s.getFullYear(),s.getMonth(),s.getDate()+i)) }
+  const apptsByDate = date => { const ds=date.toISOString().slice(0,10); return appts.filter(a=>a.date?.startsWith(ds)).sort((a,b)=>a.date.localeCompare(b.date)) }
+  const isToday = d => d.toDateString()===today().toDateString()
 
-  const totalHoje   = appts.filter(a => a.date?.startsWith(today().toISOString().slice(0, 10))).length
-  const totalMes    = appts.filter(a => { const d = new Date(a.date); return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear() }).length
-  const receitaMes  = appts.filter(a => {
-    if (a.status !== 'concluido') return false
-    const d = new Date(a.date)
-    return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear()
-  }).reduce((s, a) => s + (a.value || 0), 0)
+  /* Lembretes: agendamentos de amanhã */
+  const tomorrow = new Date(today()); tomorrow.setDate(tomorrow.getDate()+1)
+  const tomorrowStr = tomorrow.toISOString().slice(0,10)
+  const lembretes = appts.filter(a=>a.date?.startsWith(tomorrowStr)&&a.status==='agendado')
 
-  const st = {
-    page:    { padding:'28px 32px', maxWidth:1100 },
-    h1:      { fontSize:24, fontWeight:800, color:'#1A1825' },
-    sub:     { fontSize:13, color:'#8A87A0', marginTop:3 },
-    metrics: { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:24 },
-    mc:      { background:'#fff', borderRadius:14, padding:'14px 16px', border:'1px solid #E3E1F0' },
-    ml:      { fontSize:10, color:'#8A87A0', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:600, marginBottom:5 },
-    mv:      { fontSize:22, fontWeight:800 },
-    md:      { fontSize:11, marginTop:4, color:'#8A87A0' },
-    toolbar: { display:'flex', gap:10, alignItems:'center', marginBottom:20, flexWrap:'wrap' },
-    navBtn:  { padding:'7px 14px', borderRadius:8, border:'1px solid #E3E1F0', background:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', color:'#534AB7' },
-    viewBtn: { padding:'7px 14px', borderRadius:8, fontSize:12, fontWeight:600, border:'1px solid #E3E1F0', cursor:'pointer', transition:'all .15s' },
-    addBtn:  { padding:'9px 18px', background:'#534AB7', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer', marginLeft:'auto', display:'flex', alignItems:'center', gap:6 },
-    cal:     { background:'#fff', borderRadius:16, border:'1px solid #E3E1F0', overflow:'hidden' },
-    calHdr:  { display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'#F2F1F8', borderBottom:'1px solid #E3E1F0' },
-    dayHdr:  { padding:'8px 4px', textAlign:'center', fontSize:11, fontWeight:700, color:'#8A87A0', textTransform:'uppercase', letterSpacing:'.5px' },
-    calRow:  { display:'grid', gridTemplateColumns:'repeat(7,1fr)', minHeight:120, borderBottom:'1px solid #F2F1F8' },
-    dayCell: { padding:'8px 6px', borderRight:'1px solid #F2F1F8', cursor:'pointer' },
-    dayNum:  { fontSize:12, fontWeight:700, color:'#1A1825', marginBottom:4 },
-    chip:    { fontSize:10, padding:'2px 6px', borderRadius:4, marginBottom:2, fontWeight:600, cursor:'pointer' },
-    listItem:{ display:'flex', gap:12, alignItems:'flex-start', padding:'12px 0', borderBottom:'1px solid #E3E1F0' },
-    actBtn:  { padding:'4px 10px', borderRadius:7, border:'1px solid #E3E1F0', background:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', color:'#8A87A0' },
-    okBtn:   { padding:'4px 10px', borderRadius:7, border:'none', background:'#E1F5EE', fontSize:11, fontWeight:700, cursor:'pointer', color:'#085041' },
+  const todayStr = today().toISOString().slice(0,10)
+  const stats = {
+    hoje:    appts.filter(a=>a.date?.startsWith(todayStr)).length,
+    semana:  appts.length,
+    receita: appts.filter(a=>a.status==='concluido'&&a.date?.startsWith(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'))).reduce((s,a)=>s+(a.value||0),0),
   }
 
-  if (salonLoading) return <div style={{ padding: 40, color: '#8A87A0', textAlign: 'center' }}>Carregando...</div>
+  if (sl) return <div style={{padding:48,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
 
   return (
     <div className="pg">
-      <div style={{ marginBottom: 20 }}>
+      <div className="pg-hd">
         <div className="pg-h1">Agenda</div>
-        <div className="pg-sub">Agendamentos e compromissos · {salon?.name || 'BeatSalon'}</div>
+        <div className="pg-sub">Agendamentos · {salon?.name}</div>
       </div>
 
-      <div className="grid-3">
-        <div style={st.mc}><div style={st.ml}>Hoje</div><div style={st.mv}>{totalHoje}</div><div style={st.md}>agendamentos</div></div>
-        <div style={st.mc}><div style={st.ml}>Este mês</div><div style={st.mv}>{totalMes}</div><div style={st.md}>agendamentos</div></div>
-        <div style={st.mc}><div style={st.ml}>Receita mês</div><div style={{ ...st.mv, color: '#1D9E75' }}>R${receitaMes.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</div><div style={st.md}>concluídos</div></div>
+      {/* KPIs */}
+      <div className="grid-3" style={{marginBottom:16}}>
+        <div className="mc"><div className="mc-label">Hoje</div><div className="mc-value">{stats.hoje}</div><div className="mc-desc">agendamentos</div></div>
+        <div className="mc"><div className="mc-label">Próx. 7 dias</div><div className="mc-value">{stats.semana}</div><div className="mc-desc">no período</div></div>
+        <div className="mc"><div className="mc-label">Receita mês</div><div className="mc-value" style={{color:'var(--success)'}}>R${stats.receita.toLocaleString('pt-BR',{minimumFractionDigits:0})}</div><div className="mc-desc">concluídos</div></div>
       </div>
 
+      {/* Lembretes 24h */}
+      {lembretes.length>0 && (
+        <div style={{background:'linear-gradient(135deg,var(--navy-900),var(--navy-700))',borderRadius:14,padding:'14px 16px',marginBottom:16,color:'#fff'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div style={{fontWeight:800,fontSize:14}}>Lembretes de amanhã</div>
+            <span style={{fontSize:10,background:'rgba(255,255,255,.15)',padding:'3px 8px',borderRadius:20,fontWeight:700}}>{lembretes.length} agendamentos</span>
+          </div>
+          {lembretes.map(a=>{
+            const phone = a.notes?.match(/^\(?\d{2}\)?[\s.-]?9?\d{4}[\s.-]?\d{4}/)?.[0] || a.client_phone || ''
+            return (
+              <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
+                <div style={{minWidth:40,textAlign:'center',background:'rgba(255,255,255,.1)',borderRadius:6,padding:'4px'}}>
+                  <div style={{fontSize:12,fontWeight:800}}>{fmtHM(a.date)}</div>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.client_name}</div>
+                  <div style={{fontSize:11,opacity:.6}}>{a.service_name||'–'}</div>
+                </div>
+                {phone && (
+                  <a href={waLink(phone, waLembrete(a, salon?.name))} target="_blank" rel="noreferrer"
+                    style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#25D366',borderRadius:8,textDecoration:'none',color:'#fff',fontWeight:700,fontSize:11,flexShrink:0}}>
+                    <MessageSquare size={12} color="#fff" /> Lembrar
+                  </a>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Toolbar */}
       <div className="toolbar">
-        <button style={st.navBtn} onClick={() => setCurrentDate(d => view === 'semana' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7) : new Date(d.getFullYear(), d.getMonth() - 1, 1))}>‹</button>
-        <span style={{ fontWeight: 700, fontSize: 15, minWidth: 180, textAlign: 'center' }}>
-          {view === 'semana'
-            ? `${weekDays()[0].getDate()} – ${weekDays()[6].getDate()} de ${MESES[weekDays()[6].getMonth()]}`
-            : `${MESES[currentDate.getMonth()]} ${currentDate.getFullYear()}`}
+        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()-7):n.setMonth(n.getMonth()-1); return n })}>‹</button>
+        <span style={{fontWeight:700,fontSize:14,minWidth:180,textAlign:'center',color:'var(--navy-900)'}}>
+          {view==='semana' ? `${weekDays()[0].getDate()}–${weekDays()[6].getDate()} de ${MESES[weekDays()[6].getMonth()]}` : `${MESES[currDate.getMonth()]} ${currDate.getFullYear()}`}
         </span>
-        <button style={st.navBtn} onClick={() => setCurrentDate(d => view === 'semana' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7) : new Date(d.getFullYear(), d.getMonth() + 1, 1))}>›</button>
-        <button style={st.navBtn} onClick={() => setCurrentDate(today())}>Hoje</button>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {['semana', 'lista'].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ ...st.viewBtn, background: view === v ? '#534AB7' : '#fff', color: view === v ? '#fff' : '#8A87A0', borderColor: view === v ? '#534AB7' : '#E3E1F0' }}>
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()+7):n.setMonth(n.getMonth()+1); return n })}>›</button>
+        <button className="btn-secondary" onClick={()=>setCurrDate(today())}>Hoje</button>
+        <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
+          {['semana','lista'].map(v=>(
+            <button key={v} className={`filter-btn${view===v?' active':''}`} onClick={()=>setView(v)}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
             </button>
           ))}
         </div>
-        <button style={st.addBtn} onClick={() => { setEditAppt(null); setShowModal(true) }}>＋ Agendar</button>
+        <button className="btn-primary" onClick={()=>{setEditAppt(null);setShowModal(true)}} style={{display:'flex',alignItems:'center',gap:6}}>
+          <Plus size={14} color="#fff" /> Agendar
+        </button>
       </div>
 
-      {view === 'semana' && (
-        <div style={st.cal}>
-          <div style={st.calHdr}>{DIAS.map(d => <div key={d} style={st.dayHdr}>{d}</div>)}</div>
-          <div style={st.calRow}>
-            {weekDays().map((day, i) => {
+      {/* Calendário semanal */}
+      {view==='semana' && (
+        <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'var(--gray-50)',borderBottom:'1px solid var(--border)'}}>
+            {DIAS.map(d=><div key={d} style={{padding:'8px 4px',textAlign:'center',fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px'}}>{d}</div>)}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',minHeight:140}}>
+            {weekDays().map((day,i)=>{
               const dayAppts = apptsByDate(day)
               return (
-                <div key={i} style={{ ...st.dayCell, background: isToday(day) ? '#EEEDFE' : 'transparent' }}
-                  onClick={() => { setEditAppt({ date: day.toISOString().slice(0, 16) }); setShowModal(true) }}>
-                  <div style={{ ...st.dayNum, color: isToday(day) ? '#534AB7' : '#1A1825' }}>{day.getDate()}</div>
-                  {dayAppts.slice(0, 3).map(a => {
-                    const cfg = STATUS_CFG[a.status] || STATUS_CFG.agendado
+                <div key={i} style={{padding:'8px 5px',borderRight:'1px solid var(--gray-100)',background:isToday(day)?'var(--navy-50)':'transparent',cursor:'pointer',minHeight:140}}
+                  onClick={()=>{setEditAppt({date:day.toISOString().slice(0,16)});setShowModal(true)}}>
+                  <div style={{fontSize:12,fontWeight:700,color:isToday(day)?'var(--navy-600)':'var(--text)',marginBottom:4}}>{day.getDate()}</div>
+                  {dayAppts.slice(0,3).map(a=>{
+                    const cfg = STATUS[a.status]||STATUS.agendado
                     return (
-                      <div key={a.id} style={{ ...st.chip, background: cfg.bg, color: cfg.color }}
-                        onClick={e => { e.stopPropagation(); setEditAppt(a); setShowModal(true) }}>
-                        {a.date?.slice(11, 16)} {a.client_name}
-                        {a.client_id && <span title="Vinculado ao CRM"> 🔗</span>}
+                      <div key={a.id}
+                        onClick={e=>{e.stopPropagation();setEditAppt(a);setShowModal(true)}}
+                        style={{fontSize:10,padding:'3px 6px',borderRadius:5,marginBottom:2,background:cfg.bg,color:cfg.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>
+                        {fmtHM(a.date)} {a.client_name}
+                        {a.client_id&&<span title="Vinculado ao CRM" style={{marginLeft:2}}>🔗</span>}
                       </div>
                     )
                   })}
-                  {dayAppts.length > 3 && <div style={{ fontSize: 10, color: '#8A87A0' }}>+{dayAppts.length - 3} mais</div>}
+                  {dayAppts.length>3&&<div style={{fontSize:9,color:'var(--muted)',marginTop:2}}>+{dayAppts.length-3}</div>}
                 </div>
               )
             })}
@@ -425,46 +414,46 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {view === 'lista' && (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #E3E1F0', padding: '16px 20px' }}>
-          {loading ? <div style={{ textAlign: 'center', color: '#8A87A0', padding: 32 }}>Carregando...</div>
-            : appts.length === 0 ? <div style={{ textAlign: 'center', color: '#8A87A0', padding: 32 }}>Nenhum agendamento. Clique em "Agendar" para começar.</div>
-              : appts.map(a => {
-                const cfg = STATUS_CFG[a.status] || STATUS_CFG.agendado
-                const dt = new Date(a.date)
-                return (
-                  <div key={a.id} style={st.listItem}>
-                    <div style={{ minWidth: 52, textAlign: 'center', background: '#F2F1F8', borderRadius: 10, padding: '6px 8px' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#534AB7' }}>{dt.getDate()}</div>
-                      <div style={{ fontSize: 10, color: '#8A87A0' }}>{MESES[dt.getMonth()].slice(0, 3)}</div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>
-                          {a.client_name}
-                          {a.client_id && <span style={{ fontSize: 10, color: '#534AB7', marginLeft: 4 }}>🔗 CRM</span>}
-                        </span>
-                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 700, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: '#8A87A0', marginTop: 2 }}>
-                        {dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {a.service_name || '–'} {a.value ? `· R$${Number(a.value).toLocaleString('pt-BR')}` : ''}
-                      </div>
-                      {a.notes && <div style={{ fontSize: 11, color: '#8A87A0', fontStyle: 'italic', marginTop: 2 }}>{a.notes}</div>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {a.status === 'agendado' && <button style={st.okBtn} onClick={() => quickConcluir(a)}>✓ Concluir</button>}
-                      <button style={st.actBtn} onClick={() => { setEditAppt(a); setShowModal(true) }}>Editar</button>
-                      <button style={{ ...st.actBtn, color: '#D85A30', borderColor: '#F5C4B3' }} onClick={() => del(a.id)}>✕</button>
-                    </div>
+      {/* Lista */}
+      {view==='lista' && (
+        <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
+          {loading ? <div style={{padding:32,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
+          : appts.length===0 ? <div style={{padding:32,textAlign:'center',color:'var(--muted)',fontSize:13}}>Nenhum agendamento. Clique em "Agendar" para começar.</div>
+          : appts.map((a,i)=>{
+            const cfg = STATUS[a.status]||STATUS.agendado
+            const dt  = new Date(a.date)
+            return (
+              <div key={a.id} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 16px',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none'}}>
+                <div style={{minWidth:50,textAlign:'center',background:'var(--navy-50)',borderRadius:10,padding:'6px 4px',flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:'var(--navy-600)'}}>{dt.getDate()}</div>
+                  <div style={{fontSize:9,color:'var(--muted)',fontWeight:600}}>{MS[dt.getMonth()]}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--navy-500)',marginTop:2}}>{fmtHM(a.date)}</div>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <span style={{fontWeight:700,fontSize:13}}>
+                      {a.client_name}
+                      {a.client_id&&<span style={{fontSize:10,color:'var(--navy-500)',marginLeft:4}}>🔗</span>}
+                    </span>
+                    <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
                   </div>
-                )
-              })}
+                  <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>
+                    {a.service_name||'–'}{a.value?` · R$${Number(a.value).toLocaleString('pt-BR')}`:''}{a.notes?` · ${a.notes.substring(0,30)}...`:''}
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
+                  {a.status==='agendado'&&<button className="btn-success" onClick={()=>quickConcluir(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}><Check size={11} color="var(--success)"/> Concluir</button>}
+                  <WaPanel appt={a} salon={salon} onRefresh={load} />
+                  <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} title="Editar"><Edit size={12} color="var(--muted)"/></button>
+                  <button className="btn-danger" onClick={()=>del(a.id)} title="Remover"><Trash size={12} color="var(--danger)"/></button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {showModal && salon && (
-        <AgendamentoModal salonId={salon.id} appt={editAppt} onClose={() => setShowModal(false)} onSaved={fetchAppts} />
-      )}
+      {showModal&&salon&&<AgModal salonId={salon.id} appt={editAppt} onClose={()=>setShowModal(false)} onSaved={load} />}
     </div>
   )
 }
