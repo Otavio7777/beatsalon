@@ -35,6 +35,36 @@ export default function DashboardHome() {
   const [clients,   setClients]   = useState([])
   const [microdates, setMicrodates] = useState([])
   const [autoCompleted, setAutoCompleted] = useState(0)
+
+  // Agendamento próximo (janela: -5min a +30min)
+  const [proximoAppt, setProximoAppt] = useState(null)
+
+  useEffect(() => {
+    if (!salon?.id) return
+    const check = async () => {
+      const now = new Date()
+      const em5  = new Date(now.getTime() - 5*60*1000)
+      const em35 = new Date(now.getTime() + 35*60*1000)
+      const { data } = await createClient().from('appointments')
+        .select('*').eq('salon_id',salon.id).eq('status','agendado')
+        .gte('date', em5.toISOString()).lte('date', em35.toISOString())
+        .order('date').limit(1)
+      if (data?.[0]) {
+        // Só mostra se está dentro da janela -5 a +30 do horário
+        const apptTime = new Date(data[0].date)
+        const diffMin = (apptTime.getTime() - now.getTime()) / 60000
+        if (diffMin >= -30 && diffMin <= 5) setProximoAppt(data[0])
+        else setProximoAppt(null)
+      } else {
+        setProximoAppt(null)
+      }
+    }
+    check()
+    const interval = setInterval(check, 60000) // verifica a cada 1 minuto
+    return () => clearInterval(interval)
+  }, [salon?.id])
+
+
   const [stats,     setStats]     = useState({ hoje:0, semana:0, receitaHoje:0, receitaMes:0 })
   const [loading,   setLoading]   = useState(true)
   const sb = createClient()
