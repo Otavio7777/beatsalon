@@ -243,6 +243,8 @@ export default function AgendarPage({ params }) {
       setServices(sv&&sv.length>0 ? sv : DEFAULT_SVCS)
       setBlocked((bl||[]).map(b=>b.date))
       setLoading(false)
+      // Registra acesso para analytics do admin
+      sb.from('page_views').insert({ salon_id:salonId, type:'booking' }).then(()=>{}).catch(()=>{})
     })
   },[])
 
