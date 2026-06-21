@@ -223,6 +223,7 @@ export default function AgendarPage({ params }) {
   const [blocked,   setBlocked]   = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
+  const [cutPref, setCutPref] = useState('')
   const [nome,    setNome]    = useState('')
   const [fone,    setFone]    = useState('')
   const [obs,     setObs]     = useState('')
@@ -298,7 +299,7 @@ export default function AgendarPage({ params }) {
       p_client_phone: fone.replace(/\D/g,''),
       p_service_name: nomesServicos,
       p_date:         `${dataSel}T${horaSel}:00`,
-      p_notes:        obs.trim(),
+      p_notes:        obs.trim() + (cutPref.trim()?' | Corte: '+cutPref.trim():''),
     })
 
     // Atualiza valor total se veio de serviços com preço
@@ -310,7 +311,7 @@ export default function AgendarPage({ params }) {
       const { error: e2 } = await sb.from('appointments').insert({
         salon_id:salonId, client_name:nome.trim(), service_name:nomesServicos,
         date:`${dataSel}T${horaSel}:00`, value:totalPreco, status:'agendado',
-        notes:`${fone.trim()}${obs?' | '+obs:''}`,
+        notes:`${fone.trim()}${obs?' | '+obs:''}${cutPref?' | Corte: '+cutPref:''}`, cut_preference:cutPref.trim()||null,
       })
       if (e2) { setErro('Erro ao agendar. Tente novamente.'); setSalvando(false); return }
       setResultado({ isNew:null, clientName:nome.trim() })
@@ -595,6 +596,14 @@ export default function AgendarPage({ params }) {
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Observação <span style={{fontWeight:400,textTransform:'none'}}>(opcional)</span></label>
                     <input style={{width:'100%',padding:'13px 16px',borderRadius:12,border:'1.5px solid #E2E8F0',fontSize:15,outline:'none',color:'#0B1E3D',background:'#fff',fontFamily:'inherit'}}
                       placeholder="Ex: alergia, cor preferida..." value={obs} onChange={e=>setObs(e.target.value)} />
+                  </div>
+
+                  <div style={{marginBottom:16}}>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>
+                      Tipo de corte / preferência <span style={{fontWeight:400,textTransform:'none'}}>(opcional)</span>
+                    </label>
+                    <input style={{width:'100%',padding:'13px 16px',borderRadius:12,border:`1.5px solid ${cutPref?'#1B3057':'#E2E8F0'}`,fontSize:15,outline:'none',color:'#0B1E3D',background:'#fff',fontFamily:'inherit'}}
+                      placeholder="Ex: degradê na lateral, franja, mechas loiras..." value={cutPref} onChange={e=>setCutPref(e.target.value)} />
                   </div>
 
                   {erro && <div style={{background:'#FEE2E2',borderRadius:10,padding:'12px 16px',marginBottom:12,fontSize:13,color:'#DC2626',fontWeight:600,border:'1px solid #FCA5A5'}}>⚠️ {erro}</div>}
