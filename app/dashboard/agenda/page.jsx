@@ -383,6 +383,7 @@ export default function AgendaPage() {
   const { salon, user, loading:sl } = useSalon()
   const [appts, setAppts]     = useState([])
   const [loading, setLoading] = useState(true)
+  const [concludeModal, setConcludeModal] = useState(null)
   const [currDate, setCurrDate] = useState(()=>today())
   const [view, setView]       = useState('semana')
   const [showModal, setShowModal] = useState(false)
