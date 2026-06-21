@@ -242,6 +242,7 @@ export default function AgendarPage({ params }) {
   const [horaSel,   setHoraSel]   = useState('')
   const [ocupados,  setOcupados]  = useState([])
   const [blocked,   setBlocked]   = useState([])
+  const [schedCfg,  setSchedCfg]  = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
 
   const [cutPref, setCutPref] = useState('')
