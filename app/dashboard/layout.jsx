@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }) {
   // Auto-complete agendamentos passados
   useEffect(() => {
     if (!salon?.id) return
-    createClient().rpc('auto_complete_past_appointments').catch(()=>null)
+    const sb2 = createClient(); sb2.rpc('auto_complete_past_appointments').then(()=>{}).catch(()=>{})
   }, [salon?.id])
 
   const logout = async () => {
