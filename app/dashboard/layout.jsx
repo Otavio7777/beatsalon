@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 import { useSalon } from '../../lib/useSalon'
 import { useEffect, useState } from 'react'
-import { Home, Calendar, Users, DollarSign, Scissors, Clock, Package, Settings, LogOut, X, ArrowLeft } from '../../lib/icons'
+import { Home, Calendar, Users, DollarSign, Scissors, Clock, Package, Settings, LogOut, X, ArrowLeft, MessageSquare } from '../../lib/icons'
 
 const navItems = [
   { href:'/dashboard',               Icon:Home,       label:'Início' },
@@ -14,6 +14,7 @@ const navItems = [
   { href:'/dashboard/servicos',      Icon:Scissors,   label:'Serviços' },
   { href:'/dashboard/horarios',      Icon:Clock,      label:'Horários' },
   { href:'/dashboard/produtos',      Icon:Package,    label:'Produtos' },
+  { href:'/dashboard/mensagens',     Icon:MessageSquare, label:'Mensagens' },
   { href:'/dashboard/configuracoes', Icon:Settings,   label:'Configurações' },
 ]
 const bottomNav = [
