@@ -75,7 +75,7 @@ export default function ContratoDetalhe({ params }) {
       salonName: data.salon.name,
       timestamp: Date.now(),
     }))
-    router.push('/dashboard')
+    window.location.href = '/dashboard'
   }
 
   if (loading) return <div style={{color:'rgba(255,255,255,.3)',padding:40,textAlign:'center'}}>Carregando...</div>
