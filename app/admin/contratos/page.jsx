@@ -39,8 +39,12 @@ export default function ContratosPage() {
   const toggleAtivo = async (contrato) => {
     setToggling(contrato.id)
     const novoStatus = contrato.is_active === false ? true : false
-    const { error } = await sb.from('salons').update({ is_active: novoStatus }).eq('id', contrato.id)
-    if (error) { showMsg('err', error.message); setToggling(null); return }
+    const { error } = await sb.rpc('admin_toggle_salon_status', { p_salon_id: contrato.id, p_is_active: novoStatus })
+    if (error) {
+      // Fallback: tenta update direto
+      const { error: e2 } = await sb.from('salons').update({ is_active: novoStatus }).eq('id', contrato.id)
+      if (e2) { showMsg('err', e2.message || error.message); setToggling(null); return }
+    }
     await load()
     setToggling(null)
     showMsg('ok', novoStatus ? 'Contrato reativado.' : 'Contrato suspenso.')
