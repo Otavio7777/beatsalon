@@ -82,10 +82,10 @@ export default function AdminDashboard() {
 
       // Status dos servidores
       const checks = await Promise.allSettled([
-        fetch('https://plhbpzpzyqrfkhujerar.supabase.co/rest/v1/',{ headers:{'apikey':'sb_publishable_j663_Up4cZOQO7Xz7HidJw_9l07DZBz'} }).then(r=>({name:'Supabase (banco)',ok:r.ok||r.status===200,status:r.status})),
-        fetch('https://beatsalon.vercel.app/').then(r=>({name:'App principal',ok:r.ok,status:r.status})),
+        fetch('https://plhbpzpzyqrfkhujerar.supabase.co/rest/v1/',{ headers:{'apikey':'sb_publishable_j663_Up4cZOQO7Xz7HidJw_9l07DZBz'} }).then(r=>({name:'Supabase (banco)',ok:r.status<500,status:r.status})),
+        fetch('https://beatsalon.vercel.app/').then(r=>({name:'App principal',ok:r.status<500,status:r.status})),
         fetch('https://beatsalon.vercel.app/agendar/3e125ae9-8865-4411-ae81-18c50433716e').then(r=>({name:'Link de agendamento',ok:r.ok,status:r.status})),
-        fetch('https://api.supabase.com/v1/projects/plhbpzpzyqrfkhujerar',{headers:{'Authorization':'Bearer '+localStorage.getItem('sb-token')||''}}).then(r=>({name:'Supabase API',ok:r.status<500,status:r.status})),
+        fetch('https://api.supabase.com/v1/projects/plhbpzpzyqrfkhujerar',{headers:{'Authorization':'Bearer '+(localStorage.getItem('sb-token')||'')}}).then(r=>({name:'Supabase API',ok:r.status<500,status:r.status})),
       ])
 
       setServers(checks.map((c,i)=>{
