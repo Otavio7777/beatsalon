@@ -17,7 +17,22 @@ const DEFAULT_SVCS = [
   {id:'sobrancelha',  name:'Sobrancelha',  price:0,   duration:30},
 ]
 
-function gerarSlots() {
+function gerarSlots(schedCfg, date) {
+  // Se tem config de horário para este dia, usa ela
+  if (schedCfg && schedCfg.length > 0 && date) {
+    const dow = new Date(date + 'T12:00:00').getDay()
+    const cfg = schedCfg.find(c => c.day_of_week === dow)
+    if (cfg && cfg.is_open === false) return [] // dia fechado
+    if (cfg && cfg.open_time && cfg.close_time) {
+      const s = []
+      const [hI, mI] = cfg.open_time.split(':').map(Number)
+      const [hF, mF] = cfg.close_time.split(':').map(Number)
+      for (let min = hI*60+mI; min < hF*60+mF; min += 60) {
+        s.push(`${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`)
+      }
+      return s
+    }
+  }
   const s = []
   for (let h = H_INICIO; h < H_FIM; h++)
     s.push(`${String(h).padStart(2,'0')}:00`)
@@ -49,7 +64,7 @@ function fmtPreco(p) {
 }
 
 /* ── Calendário ── */
-function Cal({ valor, onChange, blockedDates = [] }) {
+function Cal({ valor, onChange, blockedDates = [], schedCfg = [] }) {
   const agora   = today()
   const [mes, setMes] = useState(agora.getMonth())
   const [ano, setAno] = useState(agora.getFullYear())
@@ -58,6 +73,12 @@ function Cal({ valor, onChange, blockedDates = [] }) {
   const cells    = [...Array(primeiro).fill(null), ...Array.from({length:ultimo},(_,i)=>i+1)]
   const str      = d => `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
   const isPast   = d => new Date(ano,mes,d) < agora
+  const isClosed = d => {
+    if (!schedCfg || schedCfg.length === 0) return false
+    const dow = new Date(ano, mes, d).getDay()
+    const cfg = schedCfg.find(x => x.day_of_week === dow)
+    return cfg ? cfg.is_open === false : false
+  }
   const isBlock  = d => blockedDates.includes(str(d))
   const isTdy    = d => new Date(ano,mes,d).toDateString() === agora.toDateString()
   const isSel    = d => valor === str(d)
@@ -76,15 +97,15 @@ function Cal({ valor, onChange, blockedDates = [] }) {
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3}}>
         {cells.map((d,i) => d===null ? <div key={`e${i}`}/> : (
-          <div key={d} onClick={()=>!isPast(d)&&!isBlock(d)&&onChange(str(d))} style={{
+          <div key={d} onClick={()=>!isPast(d)&&!isBlock(d)&&!isClosed(d)&&onChange(str(d))} style={{
             aspectRatio:'1',display:'flex',alignItems:'center',justifyContent:'center',
             borderRadius:'50%',fontSize:13,fontWeight:isSel(d)?800:500,
             cursor:(isPast(d)||isBlock(d))?'default':'pointer',
             background:isSel(d)?'#1B3057':'transparent',
-            color:isSel(d)?'#fff':(isPast(d)||isBlock(d))?'#CBD5E1':'#1E293B',
+            color:isSel(d)?'#fff':(isPast(d)||isBlock(d)||isClosed(d))?'#CBD5E1':'#1E293B',
             border:`2px solid ${isSel(d)?'#1B3057':'transparent'}`,
             position:'relative',transition:'all .12s',
-            textDecoration:isBlock(d)?'line-through':'none',
+            textDecoration:isBlock(d)?'line-through':isClosed(d)?'line-through':'none',
           }}>
             {d}
             {isTdy(d)&&!isSel(d)&&<span style={{position:'absolute',bottom:2,left:'50%',transform:'translateX(-50%)',width:4,height:4,borderRadius:2,background:'#1B3057'}}/>}
@@ -238,11 +259,13 @@ export default function AgendarPage({ params }) {
       sb.from('salons').select('*').eq('id',salonId).single(),
       sb.from('services').select('id,name,price,duration,category').eq('salon_id',salonId).eq('active',true).order('name'),
       sb.from('blocked_dates').select('date').eq('salon_id',salonId),
-    ]).then(([{data:s,error:e},{data:sv},{data:bl}]) => {
+      sb.from('schedule_config').select('day_of_week,is_open,open_time,close_time').eq('salon_id',salonId),
+    ]).then(([{data:s,error:e},{data:sv},{data:bl},{data:sc}]) => {
       if (e||!s) { setNotFound(true); setLoading(false); return }
       setSalon(s)
       setServices(sv&&sv.length>0 ? sv : DEFAULT_SVCS)
       setBlocked((bl||[]).map(b=>b.date))
+      setSchedCfg(sc||[])
       setLoading(false)
       // Registra acesso para analytics do admin
       sb.from('page_views').insert({ salon_id:salonId, type:'booking' }).then(()=>{}).catch(()=>{})
@@ -501,7 +524,7 @@ export default function AgendarPage({ params }) {
                   )}
 
                   <div style={{background:'#fff',borderRadius:16,padding:'18px',border:'1px solid #E2E8F0',boxShadow:'0 2px 12px rgba(0,0,0,.05)',marginBottom:12}}>
-                    <Cal valor={dataSel} onChange={setDataSel} blockedDates={blocked} />
+                    <Cal valor={dataSel} onChange={setDataSel} blockedDates={blocked} schedCfg={schedCfg} />
                   </div>
                   {dataSel && (
                     <div style={{background:'#DBEAFE',borderRadius:10,padding:'10px 16px',marginBottom:12,display:'flex',gap:10,alignItems:'center',border:'1px solid #93C5FD'}}>
@@ -530,7 +553,7 @@ export default function AgendarPage({ params }) {
                     </div>
                   ) : (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                      {gerarSlots().map(slot => {
+                      {gerarSlots(schedCfg, dataSel).map(slot => {
                         const ocu = ocupados.includes(slot), sel = horaSel===slot
                         return (
                           <button key={slot} onClick={()=>!ocu&&setHoraSel(slot)} style={{
