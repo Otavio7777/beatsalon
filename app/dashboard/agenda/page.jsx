@@ -15,6 +15,7 @@ const STATUS = {
   faltou:    {bg:'var(--warning-light)',color:'var(--warning)',label:'Faltou'},
 }
 
+function isTodayAppt(a) { if (!a?.date) return false; const dt = a.date.slice(0,10); return dt === today().toISOString().slice(0,10) }
 function today() { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()) }
 function fmtHM(iso) { return iso?.slice(11,16)||'' }
 
@@ -221,6 +222,16 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
           </button>
         </div>
       </div>
+    
+      {/* Modal de conclusão */}
+      {concludeModal && (
+        <ConcludeModal
+          appt={concludeModal}
+          salonName={salon?.name}
+          onClose={()=>setConcludeModal(null)}
+          onSaved={load}
+        />
+      )}
     </div>
   )
 }
@@ -267,6 +278,107 @@ function WaPanel({ appt, salon, onRefresh }) {
 }
 
 /* ── Página principal ── */
+
+/* Modal de conclusão de atendimento */
+function ConcludeModal({ appt, salonName, onClose, onSaved }) {
+  const [mode,    setMode]    = useState('normal') // normal | faltou
+  const [payment, setPayment] = useState('')
+  const [remarcar,setRemarcar]= useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const sb = createClient()
+
+  const PAGAMENTOS = [
+    { id:'pix',      label:'PIX',             icon:'💠' },
+    { id:'dinheiro', label:'Dinheiro',         icon:'💵' },
+    { id:'debito',   label:'Cartão Débito',    icon:'💳' },
+    { id:'credito',  label:'Cartão Crédito',   icon:'💳' },
+  ]
+
+  const save = async () => {
+    setSaving(true)
+    if (mode === 'faltou') {
+      await sb.from('appointments').update({ status:'faltou', no_show:true, reschedule_requested:remarcar }).eq('id', appt.id)
+    } else {
+      if (!payment) { setSaving(false); return }
+      await sb.from('appointments').update({ status:'concluido', payment_method:payment }).eq('id', appt.id)
+      // Atualiza LTV do cliente
+      if (appt.client_id && appt.value > 0) {
+        const { data:cl } = await sb.from('clients').select('ltv,visit_count').eq('id',appt.client_id).single()
+        if (cl) await sb.from('clients').update({ ltv:(cl.ltv||0)+(appt.value||0), visit_count:(cl.visit_count||0)+1, last_visit:appt.date?.slice(0,10), status:'ativo' }).eq('id',appt.client_id)
+      }
+    }
+    setSaving(false); onSaved(); onClose()
+  }
+
+  const phone = appt.notes?.match(/\d{10,11}/)?.[0]
+  const waRemarcar = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${appt.client_name}! Sentimos sua falta hoje. Gostaria de remarcar seu horário? 😊`)}` : null
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:'#fff',borderRadius:18,padding:'28px',width:'100%',maxWidth:420,boxShadow:'0 24px 60px rgba(0,0,0,.2)'}}>
+        <div style={{fontSize:17,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Concluir atendimento</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>{appt.client_name} · {appt.service_name} · {fmtHM(appt.date)}</div>
+
+        {/* Modo: normal ou faltou */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
+          {[['normal','Atendimento realizado'],['faltou','Cliente não compareceu']].map(([m,l])=>(
+            <button key={m} onClick={()=>setMode(m)}
+              style={{padding:'10px',borderRadius:10,border:`2px solid ${mode===m?'var(--navy-600)':'var(--border)'}`,background:mode===m?'var(--navy-50)':'#fff',color:mode===m?'var(--navy-700)':'var(--muted)',fontSize:12,fontWeight:700,cursor:'pointer',textAlign:'center'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'normal' && (
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:10}}>Forma de pagamento recebida *</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
+              {PAGAMENTOS.map(p=>(
+                <button key={p.id} onClick={()=>setPayment(p.id)}
+                  style={{padding:'10px',borderRadius:10,border:`2px solid ${payment===p.id?'var(--navy-600)':'var(--border)'}`,background:payment===p.id?'var(--navy-50)':'#fff',color:payment===p.id?'var(--navy-700)':'var(--text)',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+                  <span>{p.icon}</span>{p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === 'faltou' && (
+          <div style={{marginBottom:20}}>
+            <div style={{background:'var(--warning-light)',borderRadius:10,padding:'12px 14px',border:'1px solid var(--warning)',marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#92400E'}}>Cliente não compareceu</div>
+              <div style={{fontSize:12,color:'#78350F',marginTop:3}}>O agendamento será marcado como "Faltou".</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}} onClick={()=>setRemarcar(r=>!r)}>
+              <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${remarcar?'var(--navy-600)':'var(--border)'}`,background:remarcar?'var(--navy-600)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                {remarcar&&<span style={{color:'#fff',fontSize:12,fontWeight:800}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Deseja remarcar o horário?</div>
+                <div style={{fontSize:11,color:'var(--muted)'}}>Aparecerá link para WhatsApp do cliente</div>
+              </div>
+            </div>
+            {remarcar&&waRemarcar&&(
+              <a href={waRemarcar} target="_blank" rel="noreferrer"
+                style={{display:'flex',alignItems:'center',gap:8,marginTop:12,padding:'10px 14px',background:'#ECFDF5',border:'1px solid #6EE7B7',borderRadius:10,color:'#065F46',fontSize:13,fontWeight:700,textDecoration:'none'}}>
+                <span>💬</span> Enviar mensagem para remarcar
+              </a>
+            )}
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{padding:'9px 18px',borderRadius:9,border:'1px solid var(--border)',background:'#fff',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>Cancelar</button>
+          <button onClick={save} disabled={saving||(mode==='normal'&&!payment)}
+            style={{padding:'9px 20px',borderRadius:9,border:'none',background:saving||(mode==='normal'&&!payment)?'var(--gray-200)':'var(--navy-600)',color:saving||(mode==='normal'&&!payment)?'var(--muted)':'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            {saving?'Salvando...':'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AgendaPage() {
   const { salon, user, loading:sl } = useSalon()
   const [appts, setAppts]     = useState([])
