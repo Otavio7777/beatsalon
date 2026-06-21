@@ -1,22 +1,33 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase'
-import { useSalon } from '../../../lib/useSalon'
-import { Plus, Trash, Check, AlertCircle } from '../../../lib/icons'
 
 const NIVEIS = {
-  gestor:    { label:'Gestor',    desc:'Acesso total — pode adicionar admins, excluir contas, alterar tudo.',       cor:'#059669' },
-  dev:       { label:'Dev',       desc:'Acesso técnico — pode alterar contas e entrar como manutenção, mas não adicionar admins.',cor:'#2451A0' },
-  comercial: { label:'Comercial', desc:'Acesso comercial — pode visualizar contratos e entrar como manutenção.', cor:'#D97706' },
+  gestor:    { label:'Gestor',    desc:'Acesso total — adiciona admins, exclui contas, altera tudo.',        cor:'#059669', bg:'#D1FAE5', bd:'#6EE7B7' },
+  dev:       { label:'Dev',       desc:'Acesso técnico — altera contas e entra em manutenção, sem adicionar admins.', cor:'#2451A0', bg:'#DBEAFE', bd:'#93C5FD' },
+  comercial: { label:'Comercial', desc:'Acesso comercial — visualiza contratos e entra em manutenção.',     cor:'#D97706', bg:'#FEF3C7', bd:'#FCD34D' },
+}
+
+const T = { // tokens de estilo
+  page: { padding:0 },
+  h1:   { fontSize:22, fontWeight:800, color:'#0B1E3D', marginBottom:4 },
+  sub:  { fontSize:13, color:'#64748B', marginBottom:24 },
+  card: { background:'#fff', border:'1px solid #E2E8F0', borderRadius:14, padding:'20px', marginBottom:16 },
+  cH:   { fontSize:15, fontWeight:800, color:'#0B1E3D', marginBottom:4 },
+  cS:   { fontSize:12, color:'#64748B', marginBottom:14 },
+  lbl:  { display:'block', fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:5 },
+  inp:  { width:'100%', padding:'9px 14px', borderRadius:9, border:'1px solid #E2E8F0', fontSize:13, color:'#0B1E3D', outline:'none', boxSizing:'border-box', background:'#fff', fontFamily:'inherit' },
+  row:  { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid #F1F5F9' },
+  note: { fontSize:11, color:'#94A3B8', marginTop:10 },
+  msg:  (ok) => ({ display:'flex', gap:8, padding:'9px 14px', background:ok?'#D1FAE5':'#FEE2E2', border:`1px solid ${ok?'#6EE7B7':'#FCA5A5'}`, borderRadius:8, fontSize:13, color:ok?'#065F46':'#991B1B', fontWeight:600, marginBottom:14 }),
 }
 
 export default function AdminsPage() {
-  const { adminLevel } = useSalon()
   const [admins,  setAdmins]  = useState([])
   const [loading, setLoading] = useState(true)
   const [form,    setForm]    = useState({ email:'', name:'', level:'gestor' })
   const [adding,  setAdding]  = useState(false)
-  const [msg,     setMsg]     = useState({ type:'', text:'' })
+  const [msg,     setMsg]     = useState(null) // {ok, text}
   const sb = createClient()
 
   const load = async () => {
@@ -27,126 +38,108 @@ export default function AdminsPage() {
   }
   useEffect(()=>{ load() },[])
 
-  const isGestor = adminLevel === 'gestor'
-
-  const showMsg = (type, text) => {
-    setMsg({type,text})
-    setTimeout(()=>setMsg({type:'',text:''}), 3000)
-  }
+  const showMsg = (ok, text) => { setMsg({ok,text}); setTimeout(()=>setMsg(null),3500) }
 
   const add = async () => {
-    if (!isGestor) return
-    if (!form.email.trim()||!form.email.includes('@')) { showMsg('err','E-mail inválido.'); return }
-    if (admins.find(a=>a.email===form.email.trim())) { showMsg('err','E-mail já cadastrado.'); return }
+    if (!form.email.trim()||!form.email.includes('@')) { showMsg(false,'E-mail inválido.'); return }
+    if (admins.find(a=>a.email===form.email.trim())) { showMsg(false,'E-mail já cadastrado.'); return }
     setAdding(true)
-    const { error } = await sb.from('admin_emails').insert({ email:form.email.trim(), name:form.name.trim(), level:form.level })
-    if (error) { showMsg('err', error.message); setAdding(false); return }
+    const { error } = await sb.from('admin_emails').insert({ email:form.email.trim(), name:form.name.trim()||null, level:form.level })
+    setAdding(false)
+    if (error) { showMsg(false, error.message); return }
     setForm({ email:'', name:'', level:'gestor' })
-    load(); setAdding(false)
-    showMsg('ok', 'Administrador adicionado.')
+    showMsg(true, 'Administrador adicionado com sucesso.')
+    load()
   }
 
   const remove = async (email) => {
-    if (!isGestor) return
     if (!confirm(`Remover acesso de ${email}?`)) return
     await sb.from('admin_emails').delete().eq('email', email)
-    load(); showMsg('ok', 'Acesso removido.')
+    showMsg(true, 'Acesso removido.'); load()
   }
 
   const updateLevel = async (email, level) => {
-    if (!isGestor) return
     await sb.from('admin_emails').update({ level }).eq('email', email)
     load()
   }
 
-  const s = {
-    h1:  { fontSize:22,fontWeight:800,color:'#fff',marginBottom:4 },
-    sub: { fontSize:13,color:'rgba(255,255,255,.35)',marginBottom:24 },
-    card:{ background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',borderRadius:14,padding:'20px',marginBottom:14 },
-    h:   { fontSize:14,fontWeight:800,color:'#fff',marginBottom:12 },
-    inp: { padding:'9px 14px',borderRadius:10,border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.06)',color:'#fff',fontSize:13,outline:'none',fontFamily:'inherit' },
-    lbl: { fontSize:11,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.6px',display:'block',marginBottom:5 },
-    row: { display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'14px 0',borderBottom:'1px solid rgba(255,255,255,.05)' },
-    sel: { background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.15)',color:'#fff',padding:'4px 10px',borderRadius:8,fontSize:12,cursor:'pointer',fontFamily:'inherit' },
-  }
-
   return (
     <div>
-      <div style={s.h1}>Administradores</div>
-      <div style={s.sub}>Gerencie quem tem acesso ao painel administrativo</div>
+      <div style={T.h1}>Administradores</div>
+      <div style={T.sub}>Gerencie quem tem acesso ao painel administrativo da plataforma</div>
 
-      {/* Níveis de acesso */}
-      <div style={s.card}>
-        <div style={s.h}>Níveis de acesso</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-          {Object.entries(NIVEIS).map(([k,{label,desc,cor}])=>(
-            <div key={k} style={{background:'rgba(255,255,255,.03)',border:`1px solid ${cor}25`,borderRadius:12,padding:'14px'}}>
-              <div style={{fontSize:13,fontWeight:800,color:cor,marginBottom:4}}>{label}</div>
-              <div style={{fontSize:11,color:'rgba(255,255,255,.35)',lineHeight:1.5}}>{desc}</div>
+      {/* Níveis */}
+      <div style={T.card}>
+        <div style={T.cH}>Níveis de acesso</div>
+        <div style={T.cS}>Cada nível define o que o administrador pode fazer dentro do painel.</div>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10}}>
+          {Object.entries(NIVEIS).map(([k,{label,desc,cor,bg,bd}])=>(
+            <div key={k} style={{padding:'14px 16px', background:bg, border:`1px solid ${bd}`, borderRadius:12}}>
+              <div style={{fontSize:14, fontWeight:800, color:cor, marginBottom:6}}>{label}</div>
+              <div style={{fontSize:12, color:'#475569', lineHeight:1.6}}>{desc}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Adicionar */}
-      {isGestor&&(
-        <div style={s.card}>
-          <div style={s.h}>Adicionar administrador</div>
-          {msg.text&&<div style={{background:msg.type==='ok'?'rgba(5,150,105,.12)':'rgba(220,38,38,.12)',border:`1px solid ${msg.type==='ok'?'rgba(5,150,105,.25)':'rgba(220,38,38,.25)'}`,borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:13,color:msg.type==='ok'?'#6EE7B7':'#FCA5A5',display:'flex',gap:8}}>{msg.type==='ok'?<Check size={14} color="#6EE7B7"/>:<AlertCircle size={14} color="#FCA5A5"/>}{msg.text}</div>}
-          <div style={{display:'grid',gridTemplateColumns:'2fr 1.5fr 1fr auto',gap:8,alignItems:'flex-end'}}>
-            <div>
-              <label style={s.lbl}>E-mail *</label>
-              <input style={{...s.inp,width:'100%',boxSizing:'border-box'}} type="email" placeholder="admin@empresa.com" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} />
-            </div>
-            <div>
-              <label style={s.lbl}>Nome</label>
-              <input style={{...s.inp,width:'100%',boxSizing:'border-box'}} placeholder="Nome do admin" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
-            </div>
-            <div>
-              <label style={s.lbl}>Nível</label>
-              <select style={{...s.sel,width:'100%'}} value={form.level} onChange={e=>setForm(f=>({...f,level:e.target.value}))}>
-                {Object.entries(NIVEIS).map(([k,{label}])=><option key={k} value={k}>{label}</option>)}
-              </select>
-            </div>
-            <button onClick={add} disabled={adding}
-              style={{padding:'9px 14px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1E3A6E,#2451A0)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
-              <Plus size={14} color="#fff"/> {adding?'Adicionando...':'Adicionar'}
-            </button>
+      <div style={T.card}>
+        <div style={T.cH}>Adicionar novo administrador</div>
+        <div style={T.cS}>O e-mail informado terá acesso ao painel administrativo.</div>
+        {msg && <div style={T.msg(msg.ok)}>{msg.text}</div>}
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1.5fr 1fr auto', gap:10, alignItems:'flex-end'}}>
+          <div>
+            <label style={T.lbl}>E-mail *</label>
+            <input style={T.inp} type="email" placeholder="admin@email.com.br" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&add()} />
           </div>
-          <div style={{fontSize:11,color:'rgba(255,255,255,.2)',marginTop:10}}>Apenas e-mails registrados podem acessar o painel admin.</div>
+          <div>
+            <label style={T.lbl}>Nome</label>
+            <input style={T.inp} placeholder="Nome completo" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+          </div>
+          <div>
+            <label style={T.lbl}>Nível</label>
+            <select style={{...T.inp, cursor:'pointer'}} value={form.level} onChange={e=>setForm(f=>({...f,level:e.target.value}))}>
+              {Object.entries(NIVEIS).map(([k,{label}])=><option key={k} value={k}>{label}</option>)}
+            </select>
+          </div>
+          <button onClick={add} disabled={adding} style={{padding:'9px 18px', borderRadius:9, border:'none', background:'#0B1E3D', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', height:37}}>
+            {adding?'Adicionando...':'+ Adicionar'}
+          </button>
         </div>
-      )}
+        <div style={T.note}>Atenção: administradores têm acesso a dados de todos os salões. Adicione apenas e-mails de confiança.</div>
+      </div>
 
       {/* Lista */}
-      <div style={s.card}>
-        <div style={s.h}>Admins ativos ({admins.length})</div>
-        {loading ? <div style={{color:'rgba(255,255,255,.3)',textAlign:'center',padding:20}}>Carregando...</div>
-        : admins.map((a,i)=>{
+      <div style={T.card}>
+        <div style={T.cH}>Admins ativos ({admins.length})</div>
+        {loading ? (
+          <div style={{textAlign:'center', color:'#64748B', padding:20, fontSize:13}}>Carregando...</div>
+        ) : admins.length===0 ? (
+          <div style={{textAlign:'center', color:'#94A3B8', padding:20, fontSize:13}}>Nenhum administrador cadastrado.</div>
+        ) : admins.map((a,i)=>{
           const nivel = NIVEIS[a.level||'gestor']
           return (
-            <div key={a.email} style={{...s.row, borderBottom:i<admins.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-              <div style={{flex:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                  <div style={{fontWeight:700,color:'#fff',fontSize:13}}>{a.name||'—'}</div>
-                  {isGestor ? (
-                    <select value={a.level||'gestor'} onChange={e=>updateLevel(a.email,e.target.value)} style={s.sel}>
-                      {Object.entries(NIVEIS).map(([k,{label}])=><option key={k} value={k}>{label}</option>)}
-                    </select>
-                  ) : (
-                    <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,background:`${nivel.cor}18`,color:nivel.cor,border:`1px solid ${nivel.cor}25`}}>
-                      {nivel.label}
-                    </span>
-                  )}
+            <div key={a.email} style={{...T.row, borderBottom:i<admins.length-1?'1px solid #F1F5F9':'none', gap:16, flexWrap:'wrap'}}>
+              <div style={{display:'flex', alignItems:'center', gap:12, flex:1}}>
+                <div style={{width:40, height:40, borderRadius:20, background:'#0B1E3D', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:15, flexShrink:0}}>
+                  {(a.name||a.email).charAt(0).toUpperCase()}
                 </div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,.4)',marginTop:3}}>{a.email}</div>
-                {a.created_at&&<div style={{fontSize:10,color:'rgba(255,255,255,.2)',marginTop:2}}>Adicionado em {new Date(a.created_at).toLocaleDateString('pt-BR')}</div>}
+                <div>
+                  <div style={{fontSize:14, fontWeight:700, color:'#0B1E3D'}}>{a.name||'—'}</div>
+                  <div style={{fontSize:12, color:'#64748B', marginTop:2}}>{a.email}</div>
+                  {a.created_at && <div style={{fontSize:11, color:'#94A3B8', marginTop:1}}>Desde {new Date(a.created_at).toLocaleDateString('pt-BR')}</div>}
+                </div>
               </div>
-              {isGestor&&(
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                <select value={a.level||'gestor'} onChange={e=>updateLevel(a.email,e.target.value)}
+                  style={{padding:'6px 12px', borderRadius:8, border:`1px solid ${nivel.bd}`, background:nivel.bg, color:nivel.cor, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit'}}>
+                  {Object.entries(NIVEIS).map(([k,{label}])=><option key={k} value={k}>{label}</option>)}
+                </select>
                 <button onClick={()=>remove(a.email)}
-                  style={{padding:'5px 12px',borderRadius:8,border:'1px solid rgba(220,38,38,.2)',background:'rgba(220,38,38,.08)',color:'#FCA5A5',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
-                  <Trash size={12} color="#FCA5A5"/> Remover
+                  style={{padding:'6px 14px', borderRadius:8, border:'1px solid #FCA5A5', background:'#FEF2F2', color:'#DC2626', fontSize:12, fontWeight:700, cursor:'pointer'}}>
+                  Remover
                 </button>
-              )}
+              </div>
             </div>
           )
         })}
