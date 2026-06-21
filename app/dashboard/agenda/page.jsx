@@ -222,16 +222,6 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
           </button>
         </div>
       </div>
-    
-      {/* Modal de conclusão */}
-      {concludeModal && (
-        <ConcludeModal
-          appt={concludeModal}
-          salonName={salon?.name}
-          onClose={()=>setConcludeModal(null)}
-          onSaved={load}
-        />
-      )}
     </div>
   )
 }
@@ -555,7 +545,7 @@ export default function AgendaPage() {
                   </div>
                 </div>
                 <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
-                  {a.status==='agendado'&&<button className="btn-success" onClick={()=>quickConcluir(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}><Check size={11} color="var(--success)"/> Concluir</button>}
+                  {a.status==='agendado'&&<button className="btn-success" onClick={()=>setConcludeModal(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}><Check size={11} color="var(--success)"/> Concluir</button>}
                   <WaPanel appt={a} salon={salon} onRefresh={load} />
                   <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} title="Editar"><Edit size={12} color="var(--muted)"/></button>
                   <button className="btn-danger" onClick={()=>del(a.id)} title="Remover"><Trash size={12} color="var(--danger)"/></button>
@@ -567,6 +557,14 @@ export default function AgendaPage() {
       )}
 
       {showModal&&salon&&<AgModal salonId={salon.id} appt={editAppt} onClose={()=>setShowModal(false)} onSaved={load} />}
+      {concludeModal && (
+        <ConcludeModal
+          appt={concludeModal}
+          salonName={salon?.name}
+          onClose={()=>setConcludeModal(null)}
+          onSaved={load}
+        />
+      )}
     </div>
   )
 }
