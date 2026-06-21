@@ -556,3 +556,37 @@ a { text-decoration: none; color: inherit }
   color: var(--navy-600);
 }
 .quick-btn-label { font-size: 11px; font-weight: 700; color: var(--gray-600); text-align: center }
+
+/* ─── Admin panel ─── */
+.adm-page        { padding:28px 32px; max-width:1200px; }
+.adm-h1          { font-size:24px; font-weight:800; color:#0B1E3D; margin-bottom:4px; }
+.adm-sub         { font-size:13px; color:#64748B; margin-bottom:24px; }
+.adm-card        { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:20px; }
+.adm-grid-4      { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.adm-grid-2      { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.adm-grid-3      { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px; }
+.adm-kpi         { background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:16px 18px; }
+.adm-kpi-label   { font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.adm-kpi-value   { font-size:26px; font-weight:800; color:#0B1E3D; }
+.adm-kpi-desc    { font-size:11px; color:#94A3B8; margin-top:4px; }
+.adm-table       { width:100%; border-collapse:collapse; }
+.adm-th          { padding:10px 14px; font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:.4px; text-align:left; background:#F8FAFC; border-bottom:2px solid #E2E8F0; white-space:nowrap; }
+.adm-td          { padding:12px 14px; font-size:13px; color:#1E293B; border-bottom:1px solid #F1F5F9; vertical-align:middle; }
+.adm-tr:hover    { background:#FAFBFF; }
+.adm-badge-green { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:#D1FAE5; color:#065F46; border:1px solid #6EE7B7; }
+.adm-badge-red   { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5; }
+.adm-badge-warn  { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:#FEF3C7; color:#92400E; border:1px solid #FCD34D; }
+.adm-badge-blue  { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:#DBEAFE; color:#1E3A5F; border:1px solid #93C5FD; }
+.adm-btn-red     { padding:6px 14px; border-radius:8px; border:1px solid #FCA5A5; background:#FEF2F2; color:#DC2626; font-size:12px; font-weight:700; cursor:pointer; }
+.adm-btn-red:hover { background:#FEE2E2; }
+.adm-btn-green   { padding:6px 14px; border-radius:8px; border:1px solid #6EE7B7; background:#ECFDF5; color:#059669; font-size:12px; font-weight:700; cursor:pointer; }
+.adm-btn-green:hover { background:#D1FAE5; }
+.adm-btn-navy    { padding:6px 14px; border-radius:8px; border:none; background:#1B3057; color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
+.adm-btn-ghost   { padding:6px 12px; border-radius:8px; border:1px solid #E2E8F0; background:transparent; color:#64748B; font-size:12px; font-weight:600; cursor:pointer; }
+.adm-alert-red   { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; color:#991B1B; font-size:13px; font-weight:600; margin-bottom:14px; }
+.adm-alert-warn  { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:10px; color:#92400E; font-size:13px; font-weight:600; margin-bottom:14px; }
+.adm-sec-title   { font-size:15px; font-weight:800; color:#0B1E3D; margin-bottom:4px; }
+.adm-sec-sub     { font-size:12px; color:#64748B; margin-bottom:14px; }
+.adm-dot-green   { width:10px; height:10px; border-radius:50%; background:#10B981; box-shadow:0 0 0 3px rgba(16,185,129,.2); flex-shrink:0; }
+.adm-dot-red     { width:10px; height:10px; border-radius:50%; background:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,.2); flex-shrink:0; }
+.adm-dot-warn    { width:10px; height:10px; border-radius:50%; background:#F59E0B; box-shadow:0 0 0 3px rgba(245,158,11,.2); flex-shrink:0; }
