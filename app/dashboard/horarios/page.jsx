@@ -63,7 +63,7 @@ function TimeSelect({ value, onChange, disabled }) {
     <select value={value||''} onChange={e=>onChange(e.target.value)} disabled={disabled}
       style={{padding:'7px 10px',borderRadius:8,border:'1px solid var(--border)',fontSize:13,
         color:'var(--text)',background:disabled?'var(--gray-50)':'var(--white)',fontFamily:'inherit',
-        minWidth:80,cursor:disabled?'not-allowed':'pointer'}}>
+        width:'100%',maxWidth:120,cursor:disabled?'not-allowed':'pointer'}}>
       {!value && <option value="">--:--</option>}
       {halfs.map(h=><option key={h} value={h}>{h}</option>)}
     </select>
@@ -167,7 +167,7 @@ export default function HorariosPage() {
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Duração do atendimento padrão</div>
         <div style={{fontSize:12,color:'var(--muted)',marginBottom:14}}>Define o intervalo entre os horários disponíveis no agendamento online</div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',maxWidth:'100%'}}>
           {[15,20,30,45,60,90].map(min=>{
             const h0 = horarios[0]
             const cur = h0?.slot_duration || 30
@@ -214,7 +214,7 @@ export default function HorariosPage() {
 
               {/* Linha 2: horários */}
               {h.is_open && (
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginLeft:56}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginLeft:0,marginTop:8,paddingLeft:0}}>
                   <div>
                     <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:5}}>Abre</div>
                     <TimeSelect value={h.open_time} onChange={v=>setH(d,'open_time',v)}/>
@@ -238,7 +238,7 @@ export default function HorariosPage() {
                       <span style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>Pausa para almoço</span>
                     </div>
                     {hasLunch && (
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginLeft:24}}>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginLeft:0,marginTop:6}}>
                         <div>
                           <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:4}}>Início</div>
                           <TimeSelect value={h.lunch_start||''} onChange={v=>setH(d,'lunch_start',v)}/>
@@ -255,7 +255,7 @@ export default function HorariosPage() {
 
               {/* Preview de slots */}
               {h.is_open && preview===DIAS.findIndex(x=>x.d===d) && (
-                <div style={{marginTop:12,marginLeft:56,padding:'10px 14px',background:'var(--gray-50)',borderRadius:10,border:'1px solid var(--border)'}}>
+                <div style={{marginTop:12,marginLeft:0,padding:'10px 14px',background:'var(--gray-50)',borderRadius:10,border:'1px solid var(--border)'}}>
                   <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:8}}>
                     Horários disponíveis no agendamento ({slotPreview.length} slots)
                   </div>
