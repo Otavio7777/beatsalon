@@ -18,17 +18,21 @@ const DEFAULT_SVCS = [
 ]
 
 function gerarSlots(schedCfg, date) {
-  // Se tem config de horário para este dia, usa ela
   if (schedCfg && schedCfg.length > 0 && date) {
     const dow = new Date(date + 'T12:00:00').getDay()
     const cfg = schedCfg.find(c => c.day_of_week === dow)
-    if (cfg && cfg.is_open === false) return [] // dia fechado
+    if (cfg && cfg.is_open === false) return []
     if (cfg && cfg.open_time && cfg.close_time) {
       const s = []
+      const dur = cfg.slot_duration || 30
       const [hI, mI] = cfg.open_time.split(':').map(Number)
       const [hF, mF] = cfg.close_time.split(':').map(Number)
-      for (let min = hI*60+mI; min < hF*60+mF; min += 60) {
-        s.push(`${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`)
+      const ls = cfg.lunch_start ? cfg.lunch_start.split(':').map(Number).reduce((a,b,i)=>i===0?a*60+b:a+b,0) : null
+      const le = cfg.lunch_end   ? cfg.lunch_end.split(':').map(Number).reduce((a,b,i)=>i===0?a*60+b:a+b,0)   : null
+      for (let min = hI*60+mI; min + dur <= hF*60+mF; min += dur) {
+        const isLunch = ls && le && min >= ls && min < le
+        if (!isLunch)
+          s.push(`${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`)
       }
       return s
     }
