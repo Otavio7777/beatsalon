@@ -68,6 +68,13 @@ function MicrodataModal({ clientId, salonId, microdata, onClose, onSaved }) {
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         
+
+          {/* ── Recorrência ── */}
+          <div className="card">
+            <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Agendamentos recorrentes</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>Configure horários fixos que serão gerados automaticamente</div>
+            <RecorrenciaCard clientId={id} salonId={salon?.id} clientName={client?.name}/>
+          </div>
           {/* Histórico de atendimentos */}
           <div className="card" style={{marginTop:0}}>
             <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Histórico de atendimentos</div>
