@@ -269,6 +269,108 @@ function WaPanel({ appt, salon, onRefresh }) {
 
 /* ── Página principal ── */
 
+
+/* ── Modal Remarcar Atendimento ── */
+function RemarcarModal({ appt, salonName, onClose, onSaved }) {
+  const [novaData, setNovaData] = useState('')
+  const [novaHora, setNovaHora] = useState('')
+  const [saving,   setSaving]  = useState(false)
+  const [saved,    setSaved]   = useState(false)
+  const sb = createClient()
+
+  // Gera horários das 07:00 às 21:00 de 30 em 30 min
+  const horas = []
+  for (let m = 7*60; m <= 21*60; m += 30) {
+    horas.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`)
+  }
+
+  const msgWa = novaData && novaHora
+    ? `Olá ${appt.client_name?.split(' ')[0]}! 📅 Seu horário de *${appt.service_name||'atendimento'}* em *${salonName}* foi remarcado para *${new Date(novaData+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}* às *${novaHora}*. Aguardamos você! 🙂`
+    : ''
+
+  const phone = appt.notes?.match(/\d{10,11}/)?.[0]
+  const waLink = phone && msgWa ? `https://wa.me/55${phone}?text=${encodeURIComponent(msgWa)}` : null
+
+  const save = async () => {
+    if (!novaData || !novaHora) return
+    setSaving(true)
+    const newDate = `${novaData}T${novaHora}:00`
+    await sb.from('appointments').update({
+      date: newDate,
+      status: 'agendado',
+      reschedule_requested: false,
+    }).eq('id', appt.id)
+    setSaving(false)
+    setSaved(true)
+    onSaved()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+        <div style={{fontSize:16,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Remarcar atendimento</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>
+          {appt.client_name} · {appt.service_name}
+          {appt.date && <span> · agendado para {new Date(appt.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} às {fmtHM(appt.date)}</span>}
+        </div>
+
+        <label className="inp-label">Nova data *</label>
+        <input type="date" value={novaData} onChange={e=>setNovaData(e.target.value)}
+          min={new Date().toISOString().slice(0,10)}
+          className="inp-field"/>
+
+        <label className="inp-label" style={{marginTop:14}}>Novo horário *</label>
+        <select value={novaHora} onChange={e=>setNovaHora(e.target.value)} className="inp-field" style={{cursor:'pointer'}}>
+          <option value="">Selecione o horário</option>
+          {horas.map(h=><option key={h} value={h}>{h}</option>)}
+        </select>
+
+        {/* Preview mensagem WhatsApp */}
+        {msgWa && (
+          <div style={{marginTop:16,padding:'12px 14px',background:'#ECE5DD',borderRadius:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#4A4A4A',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Mensagem para o cliente</div>
+            <div style={{background:'#fff',borderRadius:'12px 12px 12px 4px',padding:'10px 12px',fontSize:13,color:'#1C1C1C',lineHeight:1.6,display:'inline-block',maxWidth:'90%',boxShadow:'0 1px 3px rgba(0,0,0,.1)'}}>
+              {msgWa}
+            </div>
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10,marginTop:18,flexWrap:'wrap'}}>
+          {!saved ? (
+            <>
+              <button onClick={save} disabled={saving||!novaData||!novaHora}
+                className="btn-primary" style={{flex:1,justifyContent:'center'}}>
+                {saving?'Salvando...':'Remarcar'}
+              </button>
+              {waLink && (
+                <a href={waLink} target="_blank" rel="noreferrer"
+                  style={{display:'flex',alignItems:'center',gap:7,padding:'11px 16px',background:'#25D366',borderRadius:'var(--radius)',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none',flex:1,justifyContent:'center'}}>
+                  💬 Avisar cliente
+                </a>
+              )}
+            </>
+          ) : (
+            <div style={{flex:1,padding:'11px 14px',background:'var(--success-light)',borderRadius:'var(--radius)',border:'1px solid #6EE7B7',color:'var(--success)',fontWeight:700,fontSize:13,textAlign:'center'}}>
+              ✓ Remarcado!
+              {waLink && (
+                <a href={waLink} target="_blank" rel="noreferrer"
+                  style={{marginLeft:10,color:'#25D366',fontWeight:700}}>
+                  Enviar WhatsApp →
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose}
+          style={{width:'100%',marginTop:10,padding:'10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /* Modal de conclusão de atendimento */
 function ConcludeModal({ appt, salonName, onClose, onSaved }) {
   const [mode,    setMode]    = useState('normal') // normal | faltou
@@ -409,6 +511,7 @@ export default function AgendaPage() {
   const [appts, setAppts]     = useState([])
   const [loading, setLoading] = useState(true)
   const [concludeModal, setConcludeModal] = useState(null)
+  const [remarcarModal,  setRemarcarModal]  = useState(null)
   const [currDate, setCurrDate] = useState(()=>today())
   const [view, setView]       = useState('semana')
   const [showModal, setShowModal] = useState(false)
@@ -581,6 +684,7 @@ export default function AgendaPage() {
                 </div>
                 <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
                   {a.status==='agendado'&&<button className="btn-success" onClick={()=>setConcludeModal(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}><Check size={11} color="var(--success)"/> Concluir</button>}
+                  {a.status==='agendado'&&<button onClick={()=>setRemarcarModal(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,padding:'6px 12px',borderRadius:8,border:'1px solid var(--navy-200)',background:'var(--navy-50)',color:'var(--navy-700)',fontWeight:700,cursor:'pointer'}}>↻ Remarcar</button>}
                   <WaPanel appt={a} salon={salon} onRefresh={load} />
                   <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} title="Editar"><Edit size={12} color="var(--muted)"/></button>
                   <button className="btn-danger" onClick={()=>del(a.id)} title="Remover"><Trash size={12} color="var(--danger)"/></button>
@@ -592,6 +696,14 @@ export default function AgendaPage() {
       )}
 
       {showModal&&salon&&<AgModal salonId={salon.id} appt={editAppt} onClose={()=>setShowModal(false)} onSaved={load} />}
+      {remarcarModal && (
+        <RemarcarModal
+          appt={remarcarModal}
+          salonName={salon?.name}
+          onClose={()=>setRemarcarModal(null)}
+          onSaved={()=>{ load(); setRemarcarModal(null) }}
+        />
+      )}
       {concludeModal && (
         <ConcludeModal
           appt={concludeModal}
