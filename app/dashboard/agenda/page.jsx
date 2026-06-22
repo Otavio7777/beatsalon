@@ -275,6 +275,7 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
   const [payment, setPayment] = useState('')
   const [remarcar,setRemarcar]= useState(false)
   const [saving,  setSaving]  = useState(false)
+  const [showWA,  setShowWA]  = useState(false)
   const sb = createClient()
 
   const PAGAMENTOS = [
@@ -288,16 +289,32 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
     setSaving(true)
     if (mode === 'faltou') {
       await sb.from('appointments').update({ status:'faltou', no_show:true, reschedule_requested:remarcar }).eq('id', appt.id)
+      setSaving(false); onSaved(); onClose()
     } else {
       if (!payment) { setSaving(false); return }
       await sb.from('appointments').update({ status:'concluido', payment_method:payment }).eq('id', appt.id)
-      // Atualiza LTV do cliente
-      if (appt.client_id && appt.value > 0) {
-        const { data:cl } = await sb.from('clients').select('ltv,visit_count').eq('id',appt.client_id).single()
-        if (cl) await sb.from('clients').update({ ltv:(cl.ltv||0)+(appt.value||0), visit_count:(cl.visit_count||0)+1, last_visit:appt.date?.slice(0,10), status:'ativo' }).eq('id',appt.client_id)
-      }
+      // Atualiza CRM via RPC
+      await sb.rpc('update_client_on_conclude', { p_appt_id: appt.id, p_value: appt.value||0 }).catch(() => {
+        // Fallback manual se RPC não existir
+        if (appt.client_id) {
+          sb.from('clients').select('ltv,visit_count,first_visit').eq('id',appt.client_id).single()
+            .then(({ data:cl }) => {
+              if (!cl) return
+              const apptDate = appt.date?.slice(0,10)
+              sb.from('clients').update({
+                last_visit:  apptDate,
+                first_visit: cl.first_visit || apptDate,
+                visit_count: (cl.visit_count||0)+1,
+                ltv:         (cl.ltv||0)+(appt.value||0),
+                status:      'ativo'
+              }).eq('id',appt.client_id)
+            })
+        }
+      })
+      setSaving(false)
+      // Oferece envio de mensagem pós-atendimento
+      setShowWA(true)
     }
-    setSaving(false); onSaved(); onClose()
   }
 
   const phone = appt.notes?.match(/\d{10,11}/)?.[0]
@@ -357,6 +374,24 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
           </div>
         )}
 
+
+        {showWA && (
+          <div style={{marginTop:16,padding:'14px',background:'#ECFDF5',borderRadius:12,border:'1px solid #6EE7B7'}}>
+            <div style={{fontSize:13,fontWeight:800,color:'#065F46',marginBottom:6}}>Atendimento concluído!</div>
+            <div style={{fontSize:12,color:'#047857',marginBottom:12}}>Deseja enviar a mensagem pós-atendimento para {appt.client_name}?</div>
+            {appt.notes?.match(/\d{10,11}/) && (
+              <a href={`https://wa.me/55${appt.notes.match(/\d{10,11}/)[0]}?text=${encodeURIComponent(`Obrigado pela visita, ${appt.client_name?.split(' ')[0]}! 🙏 Foi um prazer te atender em *${salonName}*. Esperamos que tenha gostado! Para reagendar, é só chamar. 😊`)}`}
+                target="_blank" rel="noreferrer"
+                style={{display:'inline-flex',alignItems:'center',gap:8,padding:'9px 16px',background:'#25D366',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}>
+                💬 Enviar no WhatsApp
+              </a>
+            )}
+            <button onClick={()=>{ onSaved(); onClose() }}
+              style={{marginLeft:8,padding:'9px 14px',borderRadius:10,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+              Fechar
+            </button>
+          </div>
+        )}
         <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
           <button onClick={onClose} style={{padding:'9px 18px',borderRadius:9,border:'1px solid var(--border)',background:'#fff',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>Cancelar</button>
           <button onClick={save} disabled={saving||(mode==='normal'&&!payment)}
