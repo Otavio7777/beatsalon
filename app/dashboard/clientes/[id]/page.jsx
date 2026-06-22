@@ -67,7 +67,40 @@ function MicrodataModal({ clientId, salonId, microdata, onClose, onSaved }) {
           <button onClick={save} disabled={saving} style={{ padding:'8px 20px',borderRadius:9,border:'none',background:'#534AB7',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer' }}>
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
-        </div>
+        
+          {/* Histórico de atendimentos */}
+          <div className="card" style={{marginTop:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Histórico de atendimentos</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginBottom:14}}>{appts.length} registro{appts.length!==1?'s':''}</div>
+            {appts.length === 0 ? (
+              <div style={{textAlign:'center',color:'var(--muted)',padding:'16px 0',fontSize:13}}>Nenhum atendimento registrado.</div>
+            ) : appts.map((a,i) => {
+              const dt = a.date ? new Date(a.date) : null
+              const STATUS_C = { concluido:'var(--success)', agendado:'var(--navy-500)', cancelado:'var(--danger)', faltou:'var(--warning)' }
+              return (
+                <div key={a.id} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none',alignItems:'flex-start'}}>
+                  <div style={{width:8,height:8,borderRadius:4,background:STATUS_C[a.status]||'var(--muted)',flexShrink:0,marginTop:5}}/>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:6}}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{a.service_name||'Serviço'}</div>
+                        {a.cut_preference && <div style={{fontSize:11,color:'var(--muted)',marginTop:1}}>✂️ {a.cut_preference}</div>}
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        {a.value > 0 && <div style={{fontSize:13,fontWeight:700,color:'var(--success)'}}>R${Number(a.value).toLocaleString('pt-BR')}</div>}
+                        {a.payment_method && <div style={{fontSize:10,color:'var(--muted)'}}>{a.payment_method}</div>}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:8,marginTop:4,flexWrap:'wrap',alignItems:'center'}}>
+                      <span style={{fontSize:11,color:'var(--muted)'}}>{dt?dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—'}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:STATUS_C[a.status]||'var(--muted)'}}>{a.status}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+</div>
       </div>
     </div>
   )
@@ -87,6 +120,11 @@ export default function ClienteDetailPage() {
 
   const fetchClient = async () => {
     const { data } = await sb.from('clients').select('*').eq('id', id).single()
+    const { data: appts } = await sb.from('appointments')
+      .select('id,date,service_name,value,status,payment_method,cut_preference,notes')
+      .eq('client_id', id)
+      .order('date', { ascending: false })
+      .limit(20)
     setClient(data)
     setLoading(false)
   }
