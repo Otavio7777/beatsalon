@@ -101,11 +101,31 @@ export default function MensagensPage() {
   }
 
   const waHref = (text) => {
+    const link = typeof window !== 'undefined'
+      ? `${window.location.origin}/agendar/${salon?.id||''}`
+      : `beatsalon.vercel.app/agendar/${salon?.id||''}`
     const preview = (text||'')
-      .replace('{nome}','Maria').replace('{salao}',salon?.name||'Meu Salão')
-      .replace('{servico}','Corte').replace('{data}','Segunda, 25/06').replace('{hora}','14:00')
-      .replace('{link}',`beatsalon.vercel.app/agendar/${salon?.id||''}`)
+      .replace(/\{nome\}/g,'Maria Silva')
+      .replace(/\{salao\}/g, salon?.name||'Meu Salão')
+      .replace(/\{servico\}/g,'Corte + Barba')
+      .replace(/\{data\}/g,'Segunda, 23/06')
+      .replace(/\{hora\}/g,'14:00')
+      .replace(/\{link\}/g, link)
     return `https://wa.me/?text=${encodeURIComponent(preview)}`
+  }
+
+  // Preview com substituição real
+  const previewText = (text) => {
+    const link = typeof window !== 'undefined'
+      ? `${window.location.origin}/agendar/${salon?.id||''}`
+      : ''
+    return (text||'')
+      .replace(/\{nome\}/g,'Maria Silva')
+      .replace(/\{salao\}/g, salon?.name||'Meu Salão')
+      .replace(/\{servico\}/g,'Corte + Barba')
+      .replace(/\{data\}/g,'Segunda, 23/06')
+      .replace(/\{hora\}/g,'14:00')
+      .replace(/\{link\}/g, link)
   }
 
   return (
@@ -181,7 +201,7 @@ export default function MensagensPage() {
           <div className="card">
             <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Preview — WhatsApp</div>
             <div style={{fontSize:11,color:'var(--muted)',marginBottom:14}}>Exemplo com dados fictícios</div>
-            <PhonePreview text={texts[tab]||tipo?.default||''} />
+            <PhonePreview text={previewText(texts[tab]||tipo?.default||'')} />
             <div style={{marginTop:14,display:'flex',gap:10,flexWrap:'wrap'}}>
               <a href={waHref(texts[tab]||tipo?.default)} target="_blank" rel="noreferrer" className="btn-primary" style={{fontSize:12,padding:'8px 16px',display:'inline-flex',alignItems:'center',gap:6,background:'#25D366',border:'none'}}>
                 <MessageSquare size={13} color="#fff"/> Testar no WhatsApp
