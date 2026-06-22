@@ -144,9 +144,9 @@ export default function MensagensPage() {
         ))}
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+      <div style={{display:'flex', gap:16, flexWrap:'wrap', alignItems:'flex-start'}}>
         {/* Editor */}
-        <div>
+        <div style={{flex:'1 1 300px', minWidth:0}}>
           <div className="card">
             <div style={{fontSize:15,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>{tipo?.icon} {tipo?.label}</div>
             <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>{tipo?.desc}</div>
@@ -197,7 +197,7 @@ export default function MensagensPage() {
         </div>
 
         {/* Preview */}
-        <div>
+        <div style={{flex:'1 1 280px', minWidth:0}}>
           <div className="card">
             <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Preview — WhatsApp</div>
             <div style={{fontSize:11,color:'var(--muted)',marginBottom:14}}>Exemplo com dados fictícios</div>
