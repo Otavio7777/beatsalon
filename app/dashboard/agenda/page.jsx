@@ -513,7 +513,7 @@ export default function AgendaPage() {
   const [concludeModal, setConcludeModal] = useState(null)
   const [remarcarModal,  setRemarcarModal]  = useState(null)
   const [currDate, setCurrDate] = useState(()=>today())
-  const [view, setView]       = useState('semana')
+  const [view, setView]       = useState('lista')
   const [showModal, setShowModal] = useState(false)
   const [editAppt, setEditAppt]  = useState(null)
   const sb = createClient()
@@ -658,40 +658,65 @@ export default function AgendaPage() {
       {/* Lista */}
       {view==='lista' && (
         <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
-          {loading ? <div style={{padding:32,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
-          : appts.length===0 ? <div style={{padding:32,textAlign:'center',color:'var(--muted)',fontSize:13}}>Nenhum agendamento. Clique em "Agendar" para começar.</div>
-          : appts.map((a,i)=>{
-            const cfg = STATUS[a.status]||STATUS.agendado
-            const dt  = new Date(a.date)
-            return (
-              <div key={a.id} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 16px',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none'}}>
-                <div style={{minWidth:50,textAlign:'center',background:'var(--navy-50)',borderRadius:10,padding:'6px 4px',flexShrink:0}}>
-                  <div style={{fontSize:14,fontWeight:800,color:'var(--navy-600)'}}>{dt.getDate()}</div>
-                  <div style={{fontSize:9,color:'var(--muted)',fontWeight:600}}>{MS[dt.getMonth()]}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--navy-500)',marginTop:2}}>{fmtHM(a.date)}</div>
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    <span style={{fontWeight:700,fontSize:13}}>
-                      {a.client_name}
-                      {a.client_id&&<span style={{fontSize:10,color:'var(--navy-500)',marginLeft:4}}>🔗</span>}
-                    </span>
-                    <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
+          {loading
+            ? <div style={{padding:32,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
+            : appts.length===0
+              ? <div style={{padding:32,textAlign:'center',color:'var(--muted)',fontSize:13}}>Nenhum agendamento. Clique em "Agendar" para começar.</div>
+              : appts.map((a,i)=>{
+                const cfg = STATUS[a.status]||STATUS.agendado
+                const dt  = new Date(a.date)
+                const isAgendado = a.status === 'agendado'
+                return (
+                  <div key={a.id} style={{padding:'14px 16px',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none'}}>
+                    {/* Info: mini-cal + nome + badges */}
+                    <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:isAgendado?10:0}}>
+                      <div style={{width:48,textAlign:'center',background:isAgendado?'var(--navy-600)':'var(--gray-100)',borderRadius:10,padding:'6px 4px',flexShrink:0}}>
+                        <div style={{fontSize:15,fontWeight:800,color:isAgendado?'#fff':'var(--text)'}}>{dt.getDate()}</div>
+                        <div style={{fontSize:8,fontWeight:700,textTransform:'uppercase',color:isAgendado?'rgba(255,255,255,.6)':'var(--muted)'}}>{MS[dt.getMonth()]}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:isAgendado?'rgba(255,255,255,.9)':'var(--navy-500)',marginTop:2}}>{fmtHM(a.date)}</div>
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
+                          <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{a.client_name}</span>
+                          <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
+                        </div>
+                        <div style={{fontSize:12,color:'var(--muted)'}}>
+                          {a.service_name||'—'}
+                          {a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}
+                        </div>
+                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2}}>✂️ {a.cut_preference}</div>}
+                      </div>
+                      <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
+                        <WaPanel appt={a} salon={salon} onRefresh={load} />
+                        <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} style={{padding:'6px 8px'}}>
+                          <Edit size={13} color="var(--muted)"/>
+                        </button>
+                        <button className="btn-danger" onClick={()=>del(a.id)} style={{padding:'6px 8px'}}>
+                          <Trash size={13} color="var(--danger)"/>
+                        </button>
+                      </div>
+                    </div>
+                    {/* Botões Concluir e Remarcar — visíveis para agendamentos */}
+                    {isAgendado&&(
+                      <div style={{display:'flex',gap:8,marginLeft:60,flexWrap:'wrap'}}>
+                        <button onClick={()=>setConcludeModal(a)}
+                          style={{flex:'1 1 140px',display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+                            padding:'10px 16px',borderRadius:10,border:'none',
+                            background:'var(--navy-600)',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',minHeight:42}}>
+                          <Check size={14} color="#fff"/> Concluir
+                        </button>
+                        <button onClick={()=>setRemarcarModal(a)}
+                          style={{flex:'1 1 110px',display:'flex',alignItems:'center',justifyContent:'center',gap:7,
+                            padding:'10px 16px',borderRadius:10,border:'1.5px solid var(--navy-200)',
+                            background:'var(--navy-50)',color:'var(--navy-700)',fontSize:13,fontWeight:700,cursor:'pointer',minHeight:42}}>
+                          ↻ Remarcar
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>
-                    {a.service_name||'–'}{a.value?` · R$${Number(a.value).toLocaleString('pt-BR')}`:''}{a.notes?` · ${a.notes.substring(0,30)}...`:''}
-                  </div>
-                </div>
-                <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
-                  {a.status==='agendado'&&<button className="btn-success" onClick={()=>setConcludeModal(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}><Check size={11} color="var(--success)"/> Concluir</button>}
-                  {a.status==='agendado'&&<button onClick={()=>setRemarcarModal(a)} style={{display:'flex',alignItems:'center',gap:4,fontSize:11,padding:'6px 12px',borderRadius:8,border:'1px solid var(--navy-200)',background:'var(--navy-50)',color:'var(--navy-700)',fontWeight:700,cursor:'pointer'}}>↻ Remarcar</button>}
-                  <WaPanel appt={a} salon={salon} onRefresh={load} />
-                  <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} title="Editar"><Edit size={12} color="var(--muted)"/></button>
-                  <button className="btn-danger" onClick={()=>del(a.id)} title="Remover"><Trash size={12} color="var(--danger)"/></button>
-                </div>
-              </div>
-            )
-          })}
+                )
+              })
+          }
         </div>
       )}
 
