@@ -373,134 +373,194 @@ function RemarcarModal({ appt, salonName, onClose, onSaved }) {
 
 /* Modal de conclusão de atendimento */
 function ConcludeModal({ appt, salonName, onClose, onSaved }) {
-  const [mode,    setMode]    = useState('normal') // normal | faltou
+  const [mode,    setMode]    = useState('normal')
   const [payment, setPayment] = useState('')
   const [remarcar,setRemarcar]= useState(false)
   const [saving,  setSaving]  = useState(false)
-  const [showWA,  setShowWA]  = useState(false)
+  const [err,     setErr]     = useState('')
+  const [done,    setDone]    = useState(false)
   const sb = createClient()
 
   const PAGAMENTOS = [
-    { id:'pix',      label:'PIX',             icon:'💠' },
-    { id:'dinheiro', label:'Dinheiro',         icon:'💵' },
-    { id:'debito',   label:'Cartão Débito',    icon:'💳' },
-    { id:'credito',  label:'Cartão Crédito',   icon:'💳' },
+    { id:'pix',      label:'PIX',          icon:'💠' },
+    { id:'dinheiro', label:'Dinheiro',      icon:'💵' },
+    { id:'debito',   label:'Débito',        icon:'💳' },
+    { id:'credito',  label:'Crédito',       icon:'💳' },
   ]
 
+  const phone = appt.notes?.match(/\d{10,11}/)?.[0] || appt.client_phone?.replace(/\D/g,'')
+  const waFaltou  = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá, ${appt.client_name?.split(' ')[0]}! Sentimos sua falta hoje. Gostaria de remarcar? 😊`)}` : null
+  const waPos = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Obrigado pela visita, ${appt.client_name?.split(' ')[0]}! 🙏 Foi um prazer te atender em *${salonName||'nosso salão'}*. Para reagendar é só chamar! 😊`)}` : null
+
   const save = async () => {
-    setSaving(true)
-    if (mode === 'faltou') {
-      await sb.from('appointments').update({ status:'faltou', no_show:true, reschedule_requested:remarcar }).eq('id', appt.id)
-      setSaving(false); onSaved(); onClose()
-    } else {
-      if (!payment) { setSaving(false); return }
-      await sb.from('appointments').update({ status:'concluido', payment_method:payment }).eq('id', appt.id)
-      // Atualiza CRM via RPC
-      await sb.rpc('update_client_on_conclude', { p_appt_id: appt.id, p_value: appt.value||0 }).catch(() => {
-        // Fallback manual se RPC não existir
-        if (appt.client_id) {
-          sb.from('clients').select('ltv,visit_count,first_visit').eq('id',appt.client_id).single()
-            .then(({ data:cl }) => {
-              if (!cl) return
-              const apptDate = appt.date?.slice(0,10)
-              sb.from('clients').update({
-                last_visit:  apptDate,
-                first_visit: cl.first_visit || apptDate,
-                visit_count: (cl.visit_count||0)+1,
-                ltv:         (cl.ltv||0)+(appt.value||0),
-                status:      'ativo'
-              }).eq('id',appt.client_id)
-            })
+    if (mode === 'normal' && !payment) { setErr('Selecione a forma de pagamento.'); return }
+    setSaving(true); setErr('')
+
+    try {
+      if (mode === 'faltou') {
+        /* ── Marcar como faltou ── */
+        const { error } = await sb.from('appointments')
+          .update({ status: 'faltou' })
+          .eq('id', appt.id)
+        if (error) throw new Error(error.message)
+
+      } else {
+        /* ── Marcar como concluído ── */
+        // 1. Atualiza o agendamento
+        const upd = { status: 'concluido', payment_method: payment }
+        const { error: e1 } = await sb.from('appointments').update(upd).eq('id', appt.id)
+        if (e1) {
+          // payment_method pode não existir — tenta sem
+          const { error: e2 } = await sb.from('appointments').update({ status:'concluido' }).eq('id', appt.id)
+          if (e2) throw new Error(e2.message)
         }
-      })
+
+        // 2. Atualiza CRM do cliente (diretamente, sem RPC)
+        if (appt.client_id) {
+          const { data: cl } = await sb.from('clients')
+            .select('ltv,visit_count,first_visit')
+            .eq('id', appt.client_id)
+            .maybeSingle()
+
+          const apptDate = appt.date?.slice(0,10) || new Date().toISOString().slice(0,10)
+          const crmUpd = {
+            last_visit:  apptDate,
+            status:      'ativo',
+            visit_count: (cl?.visit_count || 0) + 1,
+            ltv:         parseFloat(((cl?.ltv||0) + (appt.value||0)).toFixed(2)),
+          }
+          if (!cl?.first_visit) crmUpd.first_visit = apptDate
+
+          await sb.from('clients').update(crmUpd).eq('id', appt.client_id)
+        }
+      }
+
       setSaving(false)
-      // Oferece envio de mensagem pós-atendimento
-      setShowWA(true)
+      setDone(true)
+      onSaved() // recarrega a lista imediatamente
+
+    } catch(e) {
+      setErr(e.message || 'Erro ao salvar. Tente novamente.')
+      setSaving(false)
     }
   }
 
-  const phone = appt.notes?.match(/\d{10,11}/)?.[0]
-  const waRemarcar = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${appt.client_name}! Sentimos sua falta hoje. Gostaria de remarcar seu horário? 😊`)}` : null
-
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:'#fff',borderRadius:18,padding:'28px',width:'100%',maxWidth:420,boxShadow:'0 24px 60px rgba(0,0,0,.2)'}}>
-        <div style={{fontSize:17,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Concluir atendimento</div>
-        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>{appt.client_name} · {appt.service_name} · {fmtHM(appt.date)}</div>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'24px 20px 32px',width:'100%',maxWidth:520,
+        boxShadow:'0 -8px 40px rgba(0,0,0,.2)',maxHeight:'90vh',overflowY:'auto'}}>
 
-        {/* Modo: normal ou faltou */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
-          {[['normal','Atendimento realizado'],['faltou','Cliente não compareceu']].map(([m,l])=>(
-            <button key={m} onClick={()=>setMode(m)}
-              style={{padding:'10px',borderRadius:10,border:`2px solid ${mode===m?'var(--navy-600)':'var(--border)'}`,background:mode===m?'var(--navy-50)':'#fff',color:mode===m?'var(--navy-700)':'var(--muted)',fontSize:12,fontWeight:700,cursor:'pointer',textAlign:'center'}}>
-              {l}
-            </button>
-          ))}
+        {/* Handle */}
+        <div style={{width:40,height:4,borderRadius:2,background:'#E2E8F0',margin:'0 auto 20px'}}/>
+
+        {/* Cabeçalho */}
+        <div style={{fontSize:17,fontWeight:800,color:'#0B1E3D',marginBottom:2}}>Concluir atendimento</div>
+        <div style={{fontSize:13,color:'#64748B',marginBottom:20,paddingBottom:16,borderBottom:'1px solid #F1F5F9'}}>
+          <strong style={{color:'#0B1E3D'}}>{appt.client_name}</strong> · {appt.service_name}
+          {appt.date&&<span> · {new Date(appt.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} às {fmtHM(appt.date)}</span>}
+          {appt.value>0&&<span style={{color:'#059669',fontWeight:700,marginLeft:6}}>R${Number(appt.value).toLocaleString('pt-BR')}</span>}
         </div>
 
-        {mode === 'normal' && (
+        {/* Estado: concluído ✓ */}
+        {done ? (
           <div>
-            <div style={{fontSize:12,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:10}}>Forma de pagamento recebida *</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
-              {PAGAMENTOS.map(p=>(
-                <button key={p.id} onClick={()=>setPayment(p.id)}
-                  style={{padding:'10px',borderRadius:10,border:`2px solid ${payment===p.id?'var(--navy-600)':'var(--border)'}`,background:payment===p.id?'var(--navy-50)':'#fff',color:payment===p.id?'var(--navy-700)':'var(--text)',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
-                  <span>{p.icon}</span>{p.label}
+            {mode==='normal' ? (
+              <div>
+                <div style={{textAlign:'center',padding:'8px 0 20px'}}>
+                  <div style={{fontSize:48,marginBottom:8}}>✅</div>
+                  <div style={{fontSize:17,fontWeight:800,color:'#059669',marginBottom:4}}>Atendimento concluído!</div>
+                  <div style={{fontSize:13,color:'#64748B'}}>Pagamento via <strong>{PAGAMENTOS.find(p=>p.id===payment)?.label}</strong> · CRM atualizado</div>
+                </div>
+                {waPos&&(
+                  <a href={waPos} target="_blank" rel="noreferrer"
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px',borderRadius:12,background:'#25D366',color:'#fff',fontSize:14,fontWeight:700,textDecoration:'none',marginBottom:10}}>
+                    💬 Enviar mensagem pós-atendimento
+                  </a>
+                )}
+                <button onClick={onClose}
+                  style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                  Fechar
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{textAlign:'center',padding:'8px 0 20px'}}>
+                  <div style={{fontSize:48,marginBottom:8}}>📋</div>
+                  <div style={{fontSize:17,fontWeight:800,color:'#D97706',marginBottom:4}}>Registrado como faltou</div>
+                  <div style={{fontSize:13,color:'#64748B'}}>O agendamento foi atualizado.</div>
+                </div>
+                {waFaltou&&(
+                  <a href={waFaltou} target="_blank" rel="noreferrer"
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px',borderRadius:12,background:'#25D366',color:'#fff',fontSize:14,fontWeight:700,textDecoration:'none',marginBottom:10}}>
+                    💬 Avisar cliente
+                  </a>
+                )}
+                <button onClick={onClose}
+                  style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                  Fechar
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            {/* Modo */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:18}}>
+              {[['normal','✓  Atendimento realizado'],['faltou','✗  Cliente não veio']].map(([m,l])=>(
+                <button key={m} onClick={()=>setMode(m)}
+                  style={{padding:'11px 8px',borderRadius:11,border:`2px solid ${mode===m?'#0B1E3D':'#E2E8F0'}`,
+                    background:mode===m?'#0B1E3D':'#fff',color:mode===m?'#fff':'#64748B',
+                    fontSize:12,fontWeight:700,cursor:'pointer',textAlign:'center',lineHeight:1.4}}>
+                  {l}
                 </button>
               ))}
             </div>
-          </div>
-        )}
 
-        {mode === 'faltou' && (
-          <div style={{marginBottom:20}}>
-            <div style={{background:'var(--warning-light)',borderRadius:10,padding:'12px 14px',border:'1px solid var(--warning)',marginBottom:14}}>
-              <div style={{fontSize:13,fontWeight:700,color:'#92400E'}}>Cliente não compareceu</div>
-              <div style={{fontSize:12,color:'#78350F',marginTop:3}}>O agendamento será marcado como "Faltou".</div>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}} onClick={()=>setRemarcar(r=>!r)}>
-              <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${remarcar?'var(--navy-600)':'var(--border)'}`,background:remarcar?'var(--navy-600)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                {remarcar&&<span style={{color:'#fff',fontSize:12,fontWeight:800}}>✓</span>}
+            {/* Pagamento */}
+            {mode==='normal'&&(
+              <div style={{marginBottom:18}}>
+                <div style={{fontSize:11,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:10}}>
+                  Forma de pagamento *
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  {PAGAMENTOS.map(p=>(
+                    <button key={p.id} onClick={()=>{ setPayment(p.id); setErr('') }}
+                      style={{padding:'12px 10px',borderRadius:11,border:`2px solid ${payment===p.id?'#0B1E3D':'#E2E8F0'}`,
+                        background:payment===p.id?'#0B1E3D':'#fff',color:payment===p.id?'#fff':'#1E293B',
+                        fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,minHeight:46}}>
+                      <span>{p.icon}</span>{p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Deseja remarcar o horário?</div>
-                <div style={{fontSize:11,color:'var(--muted)'}}>Aparecerá link para WhatsApp do cliente</div>
+            )}
+
+            {/* Faltou — remarcar */}
+            {mode==='faltou'&&(
+              <div style={{marginBottom:18,padding:'14px',background:'#FFFBEB',borderRadius:12,border:'1px solid #FCD34D'}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#92400E',marginBottom:3}}>Cliente não compareceu</div>
+                <div style={{fontSize:12,color:'#78350F'}}>O agendamento ficará com status "Faltou".</div>
               </div>
-            </div>
-            {remarcar&&waRemarcar&&(
-              <a href={waRemarcar} target="_blank" rel="noreferrer"
-                style={{display:'flex',alignItems:'center',gap:8,marginTop:12,padding:'10px 14px',background:'#ECFDF5',border:'1px solid #6EE7B7',borderRadius:10,color:'#065F46',fontSize:13,fontWeight:700,textDecoration:'none'}}>
-                <span>💬</span> Enviar mensagem para remarcar
-              </a>
             )}
-          </div>
-        )}
 
+            {/* Erro */}
+            {err&&<div style={{padding:'9px 14px',background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:9,fontSize:13,color:'#DC2626',fontWeight:600,marginBottom:14}}>{err}</div>}
 
-        {showWA && (
-          <div style={{marginTop:16,padding:'14px',background:'#ECFDF5',borderRadius:12,border:'1px solid #6EE7B7'}}>
-            <div style={{fontSize:13,fontWeight:800,color:'#065F46',marginBottom:6}}>Atendimento concluído!</div>
-            <div style={{fontSize:12,color:'#047857',marginBottom:12}}>Deseja enviar a mensagem pós-atendimento para {appt.client_name}?</div>
-            {appt.notes?.match(/\d{10,11}/) && (
-              <a href={`https://wa.me/55${appt.notes.match(/\d{10,11}/)[0]}?text=${encodeURIComponent(`Obrigado pela visita, ${appt.client_name?.split(' ')[0]}! 🙏 Foi um prazer te atender em *${salonName}*. Esperamos que tenha gostado! Para reagendar, é só chamar. 😊`)}`}
-                target="_blank" rel="noreferrer"
-                style={{display:'inline-flex',alignItems:'center',gap:8,padding:'9px 16px',background:'#25D366',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}>
-                💬 Enviar no WhatsApp
-              </a>
-            )}
-            <button onClick={()=>{ onSaved(); onClose() }}
-              style={{marginLeft:8,padding:'9px 14px',borderRadius:10,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
-              Fechar
+            {/* Botão confirmar */}
+            <button onClick={save} disabled={saving||(mode==='normal'&&!payment)}
+              style={{width:'100%',padding:'14px',borderRadius:12,border:'none',fontSize:14,fontWeight:700,cursor:'pointer',
+                background:saving||(mode==='normal'&&!payment)?'#E2E8F0':'#0B1E3D',
+                color:saving||(mode==='normal'&&!payment)?'#94A3B8':'#fff',
+                marginBottom:10}}>
+              {saving?'Salvando...' : mode==='normal'?'Confirmar conclusão':'Registrar faltou'}
+            </button>
+            <button onClick={onClose}
+              style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'transparent',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+              Cancelar
             </button>
           </div>
         )}
-        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'9px 18px',borderRadius:9,border:'1px solid var(--border)',background:'#fff',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>Cancelar</button>
-          <button onClick={save} disabled={saving||(mode==='normal'&&!payment)}
-            style={{padding:'9px 20px',borderRadius:9,border:'none',background:saving||(mode==='normal'&&!payment)?'var(--gray-200)':'var(--navy-600)',color:saving||(mode==='normal'&&!payment)?'var(--muted)':'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
-            {saving?'Salvando...':'Confirmar'}
-          </button>
-        </div>
       </div>
     </div>
   )
