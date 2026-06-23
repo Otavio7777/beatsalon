@@ -36,11 +36,10 @@ export default function LoginPage() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700;800&display=swap'); input::placeholder{color:rgba(255,255,255,.3)} input:focus{border-color:rgba(255,255,255,.35)!important;outline:none}`}</style>
 
       <div style={{ textAlign:'center', marginBottom:36 }}>
-        <div style={{ width:64, height:64, borderRadius:20, background:'linear-gradient(135deg,#1E3A6E,#2451A0)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', boxShadow:'0 8px 32px rgba(36,81,160,.35)' }}>
-          <span style={{ fontFamily:'Dancing Script,cursive', fontSize:34, color:'#fff', fontWeight:700, lineHeight:1 }}>M</span>
+        <div style={{ width:72, height:72, borderRadius:22, background:'linear-gradient(135deg,#1E3A6E,#2451A0)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 18px', boxShadow:'0 8px 32px rgba(36,81,160,.4)' }}>
+          <img src="/logo-mark.svg" alt="M" style={{ width:46, height:46, objectFit:'contain', filter:'brightness(0) invert(1)' }} />
         </div>
-        <div style={{ fontFamily:'Dancing Script,cursive', fontSize:30, fontWeight:700, color:'#fff', lineHeight:1, marginBottom:4 }}>Meu Salão</div>
-        <div style={{ fontFamily:'Dancing Script,cursive', fontSize:14, color:'rgba(255,255,255,.35)' }}>by Whatsale</div>
+        <img src="/logo-full.svg" alt="Meu Salão" style={{ width:180, height:48, objectFit:'contain', filter:'brightness(0) invert(1)', display:'block', margin:'0 auto' }} />
       </div>
 
       <div style={{ width:'100%', maxWidth:400, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:'32px 28px', backdropFilter:'blur(20px)', boxShadow:'0 24px 60px rgba(0,0,0,.35)' }}>
