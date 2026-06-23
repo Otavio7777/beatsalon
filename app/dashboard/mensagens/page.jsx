@@ -57,7 +57,7 @@ function PhonePreview({ text }) {
 }
 
 export default function MensagensPage() {
-  const { salon } = useSalon()
+  const { salon, isBarber } = useSalon()
   const [tab,     setTab]     = useState('aniversario')
   const [texts,   setTexts]   = useState({})
   const [active,  setActive]  = useState({})
@@ -171,6 +171,11 @@ export default function MensagensPage() {
       <div style={{display:'flex', gap:16, flexWrap:'wrap', alignItems:'flex-start'}}>
         {/* Editor */}
         <div style={{flex:'1 1 300px', minWidth:0}}>
+          {isBarber && (
+            <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:14,fontSize:12,color:'#92400E',fontWeight:600}}>
+              ⚠️ Visualização apenas. Barbeiros não podem editar os templates de mensagem.
+            </div>
+          )}
           <div className="card">
             <div style={{fontSize:15,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>{tipo?.icon} {tipo?.label}</div>
             <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>{tipo?.desc}</div>
@@ -261,7 +266,7 @@ export default function MensagensPage() {
             </div>
           </div>
 
-          <button onClick={save} disabled={saving} className="btn-primary" style={{width:'100%',padding:'13px',fontSize:14,borderRadius:12,justifyContent:'center',marginTop:12}}>
+          <button onClick={save} disabled={saving||isBarber} className="btn-primary" style={{width:'100%',padding:'13px',fontSize:14,borderRadius:12,justifyContent:'center',marginTop:12}}>
             {saving?'Salvando...' : saved?<><Check size={14} color="#fff" style={{marginRight:6}}/>Salvo!</>:'Salvar todas as mensagens'}
           </button>
         </div>
