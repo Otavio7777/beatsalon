@@ -76,8 +76,7 @@ export default function OnboardingPage() {
 
         {/* Logo */}
         <div style={{textAlign:'center', marginBottom:28}}>
-          <div style={{fontFamily:'Dancing Script,cursive', fontSize:28, fontWeight:700, color:'#0B1E3D', lineHeight:1}}>Meu Salão</div>
-          <div style={{fontFamily:'Dancing Script,cursive', fontSize:13, color:'#94A3B8'}}>by Whatsale</div>
+          <img src="/logo-full.svg" alt="Meu Salão" style={{width:160, height:43, objectFit:'contain', display:'block', margin:'0 auto'}} />
         </div>
 
         {/* Progress */}
