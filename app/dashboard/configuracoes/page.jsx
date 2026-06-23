@@ -39,7 +39,11 @@ export default function ConfiguracoesPage() {
   useEffect(() => { if (!sl && !user) window.location.href = '/login' }, [sl, user])
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const bookingLink = salon ? `${origin}/agendar/${salon.id}` : ''
+  // Gera slug a partir do nome do salão
+  const toSlug = (name) => (name||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const bookingLink = salon ? `${origin}/agendar/${toSlug(salon.name)}` : ''
 
   const handleLogoFile = (e) => {
     const file = e.target.files?.[0]
@@ -110,13 +114,6 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="pg">
-      {/* Banner de restrição para barbeiros */}
-      {isBarber && (
-        <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:16,fontSize:12,color:'#92400E',fontWeight:600}}>
-          ⚠️ Como barbeiro, você pode editar apenas seu perfil pessoal. As configurações do salão (nome, logo, endereço, preços) só podem ser alteradas pelo gestor.
-        </div>
-      )}
-
       <div className="pg-hd">
         <div className="pg-h1">Configurações</div>
         <div className="pg-sub">Perfil e personalização · {salon?.name}</div>
