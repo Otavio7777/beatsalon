@@ -164,12 +164,12 @@ a { text-decoration: none; color: inherit }
   flex: 1;
 }
 .sidebar-logo-img {
-  /* Invert the blue logo to white for dark sidebar */
   filter: brightness(0) invert(1);
+  width: 138px;
+  height: 37px;
   object-fit: contain;
-  max-width: 140px;
-  height: auto;
   display: block;
+  flex-shrink: 0;
 }
 .sidebar-close-btn {
   flex-shrink: 0;
@@ -356,7 +356,9 @@ a { text-decoration: none; color: inherit }
   z-index: 30;
   box-shadow: 0 1px 3px rgba(0,0,0,.04);
   flex-shrink: 0;
-  overflow: hidden;
+  /* needed for absolute-centered logo */
+  position: sticky;
+  overflow: visible;
 }
 
 /* Hamburger */
@@ -384,14 +386,19 @@ a { text-decoration: none; color: inherit }
   transition: width .2s;
 }
 
-/* Logo in header — shown on mobile, hidden on desktop */
+/* Logo in header — centered on mobile, hidden on desktop */
 .header-logo-wrap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
+  pointer-events: none;
 }
 .header-logo-img {
-  /* Keep brand colour on white header */
   display: block;
+  width: 108px;
+  height: auto;
   object-fit: contain;
 }
 @media (min-width: 769px) {
