@@ -110,6 +110,13 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="pg">
+      {/* Banner de restrição para barbeiros */}
+      {isBarber && (
+        <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:16,fontSize:12,color:'#92400E',fontWeight:600}}>
+          ⚠️ Como barbeiro, você pode editar apenas seu perfil pessoal. As configurações do salão (nome, logo, endereço, preços) só podem ser alteradas pelo gestor.
+        </div>
+      )}
+
       <div className="pg-hd">
         <div className="pg-h1">Configurações</div>
         <div className="pg-sub">Perfil e personalização · {salon?.name}</div>
