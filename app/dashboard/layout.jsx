@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 import { useSalon } from '../../lib/useSalon'
@@ -26,23 +27,12 @@ function useNavItems(salon) {
   return base
 }
 
-const navItems = [
+const bottomNav = [
   { href:'/dashboard',               Icon:Home,          label:'Início' },
   { href:'/dashboard/agenda',        Icon:Calendar,      label:'Agenda' },
   { href:'/dashboard/clientes',      Icon:Users,         label:'Clientes' },
-  { href:'/dashboard/financeiro',    Icon:DollarSign,    label:'Financeiro' },
-  { href:'/dashboard/servicos',      Icon:Scissors,      label:'Serviços' },
-  { href:'/dashboard/horarios',      Icon:Clock,         label:'Horários' },
-  { href:'/dashboard/mensagens',     Icon:MessageSquare, label:'Mensagens' },
-  { href:'/dashboard/produtos',      Icon:Package,       label:'Produtos' },
+  { href:'/dashboard/financeiro',    Icon:DollarSign,    label:'Financeiro'},
   { href:'/dashboard/configuracoes', Icon:Settings,      label:'Config' },
-]
-const bottomNav = [
-  { href:'/dashboard',               Icon:Home,     label:'Início' },
-  { href:'/dashboard/agenda',        Icon:Calendar, label:'Agenda' },
-  { href:'/dashboard/clientes',      Icon:Users,    label:'Clientes' },
-  { href:'/dashboard/financeiro',    Icon:DollarSign,label:'Financeiro'},
-  { href:'/dashboard/configuracoes', Icon:Settings, label:'Config' },
 ]
 
 export default function DashboardLayout({ children }) {
@@ -50,12 +40,17 @@ export default function DashboardLayout({ children }) {
   const router   = useRouter()
   const { salon, user, loading, isAdmin, adminLevel, maintenanceMode, maintenanceName, exitMaintenance } = useSalon()
   const [open, setOpen] = useState(false)
-  const [mobile, setMobile] = useState(true)
+  const [isMobile, setIsMobile] = useState(true)
   const dynamicNav = useNavItems(salon)
 
   useEffect(() => {
-    const check = () => { const m = window.innerWidth < 769; setMobile(m); setOpen(!m) }
-    check(); window.addEventListener('resize', check)
+    const check = () => {
+      const m = window.innerWidth < 769
+      setIsMobile(m)
+      setOpen(!m)
+    }
+    check()
+    window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
 
@@ -80,112 +75,177 @@ export default function DashboardLayout({ children }) {
     router.push('/login')
   }
 
-  const isActive = (href) => href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
-  const cur = navItems.find(n => isActive(n.href)) || navItems[0]
+  const isActive = (href) =>
+    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+
+  const allNav = dynamicNav
+  const curNav = allNav.find(n => isActive(n.href)) || allNav[0]
 
   if (loading) return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--bg)'}}>
-      <div style={{color:'var(--muted)',fontSize:14}}>Carregando...</div>
+    <div className="layout-loading">
+      <div className="layout-loading-dot"/>
     </div>
   )
 
   return (
-    <div style={{display:'flex',minHeight:'100vh',position:'relative'}}>
-      {mobile&&open && <div className="sidebar-backdrop" onClick={()=>setOpen(false)}/>}
+    <div className="layout-root">
 
-      <aside className={`sidebar ${open?'open':'closed'}`}>
-        <div className="sidebar-brand" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-          <div>
-            <div className="sidebar-logo">Meu Salão</div>
-            <div className="sidebar-tagline">by Whatsale</div>
+      {/* Backdrop — mobile only */}
+      {isMobile && open && (
+        <div className="sidebar-backdrop" onClick={() => setOpen(false)} />
+      )}
+
+      {/* ── SIDEBAR ── */}
+      <aside className={`sidebar${open ? ' open' : ' closed'}`}>
+
+        {/* Brand */}
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-inner">
+            <Image
+              src="/logo-full.svg"
+              alt="Meu Salão"
+              width={140}
+              height={38}
+              className="sidebar-logo-img"
+              priority
+            />
           </div>
-          {mobile&&<button onClick={()=>setOpen(false)} style={{background:'rgba(255,255,255,.08)',border:'none',borderRadius:8,width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'rgba(255,255,255,.6)',marginTop:2,flexShrink:0}}>
-            <X size={15} color="currentColor"/>
-          </button>}
+          {isMobile && (
+            <button className="sidebar-close-btn" onClick={() => setOpen(false)} aria-label="Fechar menu">
+              <X size={15} />
+            </button>
+          )}
         </div>
 
-        {/* Nome / modo manutenção */}
-        <div style={{padding:'5px 16px 4px',display:'flex',alignItems:'center',gap:6}}>
-          {maintenanceMode && <div style={{width:6,height:6,borderRadius:3,background:'#F59E0B',flexShrink:0}}/>}
-          <span style={{fontSize:11,color:'rgba(255,255,255,.3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-            {maintenanceMode ? maintenanceName : (salon?.name||'')}
+        {/* Salon name / maintenance indicator */}
+        <div className="sidebar-salon-name">
+          {maintenanceMode && <span className="sidebar-maintenance-dot"/>}
+          <span className="sidebar-salon-label">
+            {maintenanceMode ? maintenanceName : (salon?.name || '')}
           </span>
         </div>
 
-        <nav style={{padding:'6px 0',flex:1,overflowY:'auto'}}>
+        {/* Navigation */}
+        <nav className="sidebar-nav">
           <div className="nav-section-label">Menu</div>
-          {dynamicNav.map(({href,Icon,label})=>(
-            <Link href={href} key={href} className={`nav-item${isActive(href)?' active':''}`} onClick={()=>mobile&&setOpen(false)}>
-              <Icon size={15}/>{label}
+          {dynamicNav.map(({ href, Icon, label }) => (
+            <Link
+              href={href}
+              key={href}
+              className={`nav-item${isActive(href) ? ' active' : ''}`}
+              onClick={() => isMobile && setOpen(false)}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
             </Link>
           ))}
-          {isAdmin&&(
+
+          {isAdmin && (
             <>
-              <div className="nav-section-label" style={{marginTop:8}}>Admin</div>
+              <div className="nav-section-label" style={{ marginTop: 8 }}>Admin</div>
               {maintenanceMode ? (
-                <button onClick={exitMaintenance} className="nav-item"
-                  style={{border:'none',background:'rgba(245,158,11,.1)',color:'#F59E0B',width:'100%',cursor:'pointer',borderRadius:8,textAlign:'left'}}>
-                  <ArrowLeft size={14} color="#F59E0B"/> Sair manutenção
+                <button
+                  onClick={exitMaintenance}
+                  className="nav-item nav-item-maintenance"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Sair manutenção</span>
                 </button>
               ) : (
-                <Link href="/admin" className="nav-item" onClick={()=>mobile&&setOpen(false)} style={{color:'rgba(245,158,11,.8)'}}>
-                  <Settings size={14} color="rgba(245,158,11,.8)"/> Painel Admin
+                <Link
+                  href="/admin"
+                  className="nav-item nav-item-admin"
+                  onClick={() => isMobile && setOpen(false)}
+                >
+                  <Settings size={14} />
+                  <span>Painel Admin</span>
                 </Link>
               )}
             </>
           )}
         </nav>
 
-        <div style={{padding:'10px 8px',borderTop:'1px solid rgba(255,255,255,.07)'}}>
-          <button onClick={logout} className="nav-item" style={{border:'none',background:'transparent',width:'100%'}}>
-            <LogOut size={14}/> Sair
+        {/* Logout */}
+        <div className="sidebar-footer">
+          <button onClick={logout} className="nav-item nav-item-logout">
+            <LogOut size={14} />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
-      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,maxWidth:'100%'}}>
-        {/* Banner manutenção */}
-        {maintenanceMode&&(
-          <div style={{background:'#78350F',borderBottom:'2px solid #D97706',padding:'8px 16px',display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:8,height:8,borderRadius:4,background:'#F59E0B',flexShrink:0}}/>
-            <div style={{flex:1,fontSize:13,color:'#FDE68A',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-              Manutenção — <strong style={{color:'#fff'}}>{maintenanceName}</strong>
+      {/* ── MAIN AREA ── */}
+      <div className="layout-main">
+
+        {/* Maintenance banner */}
+        {maintenanceMode && (
+          <div className="maintenance-banner">
+            <div className="maintenance-dot" />
+            <div className="maintenance-label">
+              Manutenção — <strong>{maintenanceName}</strong>
             </div>
-            <button onClick={exitMaintenance}
-              style={{padding:'5px 12px',background:'rgba(245,158,11,.2)',border:'1px solid rgba(245,158,11,.35)',borderRadius:8,color:'#FDE68A',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>
-              <ArrowLeft size={11} color="#FDE68A" style={{marginRight:4}}/>Voltar
+            <button onClick={exitMaintenance} className="maintenance-exit-btn">
+              <ArrowLeft size={11} />
+              Voltar
             </button>
           </div>
         )}
 
+        {/* Top header */}
         <header className="top-header">
-          <button className="hamburger" onClick={()=>setOpen(o=>!o)} aria-label="Menu" style={{display:'flex',flexDirection:'column',gap:4,background:'none',border:'none',padding:'6px',cursor:'pointer',borderRadius:8}}>
-            <span style={{display:'block',width:20,height:2,background:'var(--navy-600)',borderRadius:1}}/>
-            <span style={{display:'block',width:14,height:2,background:'var(--navy-600)',borderRadius:1}}/>
-            <span style={{display:'block',width:20,height:2,background:'var(--navy-600)',borderRadius:1}}/>
+          <button
+            className="hamburger"
+            onClick={() => setOpen(o => !o)}
+            aria-label="Menu"
+          >
+            <span style={{ width: 20 }} />
+            <span style={{ width: 14 }} />
+            <span style={{ width: 20 }} />
           </button>
-          <div className="header-title">
-            <cur.Icon size={14} color="var(--navy-600)" style={{marginRight:6,flexShrink:0}}/>{cur.label}
+
+          {/* Logo no header — mobile only */}
+          <div className="header-logo-wrap">
+            <Image
+              src="/logo-full.svg"
+              alt="Meu Salão"
+              width={100}
+              height={27}
+              className="header-logo-img"
+              priority
+            />
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {isAdmin&&!maintenanceMode&&(
-              <Link href="/admin" style={{fontSize:11,fontWeight:700,padding:'3px 9px',borderRadius:20,background:'rgba(245,158,11,.1)',color:'#D97706',border:'1px solid rgba(245,158,11,.2)',textDecoration:'none',whiteSpace:'nowrap'}}>
-                Admin
-              </Link>
+
+          <div className="header-title">
+            <curNav.Icon size={14} style={{ marginRight: 6, flexShrink: 0 }} />
+            {curNav.label}
+          </div>
+
+          <div className="header-actions">
+            {isAdmin && !maintenanceMode && (
+              <Link href="/admin" className="header-admin-badge">Admin</Link>
             )}
-            <div className="header-avatar">{salon?.name?.charAt(0)?.toUpperCase()||'M'}</div>
+            <div className="header-avatar">
+              {salon?.name?.charAt(0)?.toUpperCase() || 'M'}
+            </div>
           </div>
         </header>
 
-        <main className="main-content" style={{flex:1,overflow:'auto',background:'var(--bg)',minWidth:0}}>
+        <main className="main-content">
           {children}
         </main>
       </div>
 
+      {/* ── BOTTOM NAV (mobile) ── */}
       <nav className="bottom-nav">
-        {bottomNav.map(({href,Icon,label})=>(
-          <Link key={href} href={href} className={`bottom-nav-item${isActive(href)?' active':''}`}>
-            <span className="bottom-nav-icon"><Icon size={20} color={isActive(href)?'var(--navy-600)':'var(--gray-400)'}/></span>
+        {bottomNav.map(({ href, Icon, label }) => (
+          <Link
+            key={href}
+            href={href}
+            className={`bottom-nav-item${isActive(href) ? ' active' : ''}`}
+          >
+            <span className="bottom-nav-icon">
+              <Icon size={20} />
+            </span>
             <span>{label}</span>
           </Link>
         ))}
