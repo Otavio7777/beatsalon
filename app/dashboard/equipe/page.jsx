@@ -69,10 +69,31 @@ export default function EquipePage() {
 
     let error
     if (editing) {
-      ;({ error } = await sb.from('barbers').update(payload).eq('id', editing))
+      // Usa RPC SECURITY DEFINER para bypasear RLS
+      const { error: e } = await sb.rpc('update_barber', {
+        p_id: editing,
+        p_name: form.name.trim(),
+        p_email: form.email.trim().toLowerCase(),
+        p_phone: form.phone.trim(),
+        p_role: form.role,
+        p_commission_type: form.commission_type,
+        p_commission_value: Number(form.commission_value)||0,
+        p_color: form.color,
+      })
+      error = e
     } else {
       if (!canAdd) { showMsg(false, `Limite de ${planLimit} barbeiro${planLimit>1?'s':''} atingido. Faça upgrade do plano.`); return }
-      ;({ error } = await sb.from('barbers').insert(payload))
+      const { error: e } = await sb.rpc('insert_barber', {
+        p_salon_id: salon.id,
+        p_name: form.name.trim(),
+        p_email: form.email.trim().toLowerCase(),
+        p_phone: form.phone.trim(),
+        p_role: form.role,
+        p_commission_type: form.commission_type,
+        p_commission_value: Number(form.commission_value)||0,
+        p_color: form.color,
+      })
+      error = e
     }
 
     if (error) { showMsg(false, error.message); return }
@@ -84,7 +105,7 @@ export default function EquipePage() {
 
   const toggleActive = async (b) => {
     if (!b.active && !canAdd) { showMsg(false,'Limite de barbeiros atingido.'); return }
-    await sb.from('barbers').update({ active:!b.active }).eq('id', b.id)
+    await sb.rpc('toggle_barber_active', { p_id: b.id, p_active: !b.active })
     load()
   }
 
