@@ -54,19 +54,14 @@ export default function AdminLogin() {
           <div style={{textAlign:'center', marginBottom:40}}>
             <div style={{
               display:'inline-flex', alignItems:'center', justifyContent:'center',
-              width:64, height:64, borderRadius:20,
+              width:72, height:72, borderRadius:22,
               background:'linear-gradient(135deg,#1E3A6E,#2451A0)',
-              marginBottom:16,
+              marginBottom:18,
               boxShadow:'0 8px 32px rgba(36,81,160,.4)',
             }}>
-              <span style={{fontFamily:'Dancing Script,cursive',fontSize:32,color:'#fff',fontWeight:700,lineHeight:1}}>M</span>
+              <img src="/logo-mark.svg" alt="M" style={{width:46,height:46,objectFit:'contain',filter:'brightness(0) invert(1)'}} />
             </div>
-            <div style={{fontFamily:'Dancing Script,cursive',fontSize:28,fontWeight:700,color:'#fff',marginBottom:4}}>
-              Meu Salão
-            </div>
-            <div style={{fontFamily:'Dancing Script,cursive',fontSize:14,color:'rgba(255,255,255,.35)'}}>
-              by Whatsale
-            </div>
+            <img src="/logo-full.svg" alt="Meu Salão" style={{width:180,height:48,objectFit:'contain',filter:'brightness(0) invert(1)',display:'block',margin:'0 auto'}} />
             <div style={{
               display:'inline-block', marginTop:10,
               fontSize:10, fontWeight:800, letterSpacing:'2px', textTransform:'uppercase',
