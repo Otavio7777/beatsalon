@@ -3,285 +3,425 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '../../../../lib/supabase'
 import { useSalon } from '../../../../lib/useSalon'
+import Link from 'next/link'
 
-const badgeCfg = {
-  ativo:    { bg:'#E1F5EE', color:'#085041', label:'Ativo' },
-  em_risco: { bg:'#FAEEDA', color:'#633806', label:'Em risco' },
-  inativo:  { bg:'#F0EFF8', color:'#8A87A0', label:'Inativo' },
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+const STATUS_CFG = {
+  ativo:    { bg:'#D1FAE5', color:'#065F46', label:'Ativo',    bd:'#6EE7B7' },
+  em_risco: { bg:'#FEF3C7', color:'#92400E', label:'Em risco', bd:'#FCD34D' },
+  inativo:  { bg:'#F1F5F9', color:'#64748B', label:'Inativo',  bd:'#CBD5E1' },
 }
-const typeIcon = { aniversario:'🎂', evento:'🎉', reuniao:'💼', outro:'📌' }
+const STATUS_A = { agendado:'#2451A0', concluido:'#059669', cancelado:'#DC2626', faltou:'#D97706' }
 
-function Av({ color='#534AB7', sz=56, name='' }) {
-  const ini = name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase() || '?'
+function Avatar({ name, color='#1B3057', size=56 }) {
+  const ini = (name||'?').trim().split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?'
   return (
-    <div style={{ width:sz, height:sz, borderRadius:'50%', background:color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800, fontSize:sz*.34, flexShrink:0 }}>
+    <div style={{width:size,height:size,borderRadius:size/2,background:color,color:'#fff',
+      display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*.33,fontWeight:800,flexShrink:0}}>
       {ini}
     </div>
   )
 }
 
-// Modal de microdata
-function MicrodataModal({ clientId, salonId, microdata, onClose, onSaved }) {
-  const [form, setForm] = useState({ title:'', description:'', date:'', type:'outro', ...microdata })
-  const [saving, setSaving] = useState(false)
-  const sb = createClient()
-  const set = (k,v) => setForm(f=>({...f,[k]:v}))
-
-  const save = async () => {
-    if (!form.title || !form.date) return
-    setSaving(true)
-    const payload = { ...form, client_id: clientId, salon_id: salonId }
-    if (microdata?.id)
-      await sb.from('microdates').update(payload).eq('id', microdata.id)
-    else
-      await sb.from('microdates').insert(payload)
-    onSaved(); onClose()
-  }
-
-  const ov = {
-    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16 },
-    box: { background:'#fff',borderRadius:20,padding:'28px',width:'100%',maxWidth:420 },
-    hd: { fontSize:17,fontWeight:800,marginBottom:18 },
-    label: { fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:5,display:'block',marginTop:12 },
-    input: { width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E3E1F0',fontSize:13,outline:'none',color:'#1A1825' },
-    select: { width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E3E1F0',fontSize:13,outline:'none',background:'#fff',color:'#1A1825' },
-    foot: { display:'flex',gap:10,justifyContent:'flex-end',marginTop:20,paddingTop:16,borderTop:'1px solid #E3E1F0' },
-  }
-
+function InfoRow({ label, value, highlight }) {
+  if (!value && value!==0) return null
   return (
-    <div style={ov.overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={ov.box}>
-        <div style={ov.hd}>{microdata?.id ? 'Editar microdata' : 'Nova microdata'}</div>
-        <label style={ov.label}>Título *</label>
-        <input style={ov.input} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Ex: Aniversário da esposa" />
-        <label style={ov.label}>Tipo</label>
-        <select style={ov.select} value={form.type} onChange={e=>set('type',e.target.value)}>
-          {Object.entries(typeIcon).map(([k,v])=><option key={k} value={k}>{v} {k.charAt(0).toUpperCase()+k.slice(1)}</option>)}
-        </select>
-        <label style={ov.label}>Data *</label>
-        <input style={ov.input} type="date" value={form.date} onChange={e=>set('date',e.target.value)} />
-        <label style={ov.label}>Ação sugerida</label>
-        <input style={ov.input} value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Ex: Antecipar corte, enviar mensagem especial" />
-        <div style={ov.foot}>
-          <button onClick={onClose} style={{ padding:'8px 18px',borderRadius:9,border:'1px solid #E3E1F0',background:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',color:'#8A87A0' }}>Cancelar</button>
-          <button onClick={save} disabled={saving} style={{ padding:'8px 20px',borderRadius:9,border:'none',background:'#534AB7',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer' }}>
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
-        
-
-          {/* ── Recorrência ── */}
-          <div className="card">
-            <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Agendamentos recorrentes</div>
-            <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>Configure horários fixos que serão gerados automaticamente</div>
-            <RecorrenciaCard clientId={id} salonId={salon?.id} clientName={client?.name}/>
-          </div>
-          {/* Histórico de atendimentos */}
-          <div className="card" style={{marginTop:0}}>
-            <div style={{fontSize:14,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Histórico de atendimentos</div>
-            <div style={{fontSize:12,color:'var(--muted)',marginBottom:14}}>{appts.length} registro{appts.length!==1?'s':''}</div>
-            {appts.length === 0 ? (
-              <div style={{textAlign:'center',color:'var(--muted)',padding:'16px 0',fontSize:13}}>Nenhum atendimento registrado.</div>
-            ) : appts.map((a,i) => {
-              const dt = a.date ? new Date(a.date) : null
-              const STATUS_C = { concluido:'var(--success)', agendado:'var(--navy-500)', cancelado:'var(--danger)', faltou:'var(--warning)' }
-              return (
-                <div key={a.id} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none',alignItems:'flex-start'}}>
-                  <div style={{width:8,height:8,borderRadius:4,background:STATUS_C[a.status]||'var(--muted)',flexShrink:0,marginTop:5}}/>
-                  <div style={{flex:1}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:6}}>
-                      <div>
-                        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{a.service_name||'Serviço'}</div>
-                        {a.cut_preference && <div style={{fontSize:11,color:'var(--muted)',marginTop:1}}>✂️ {a.cut_preference}</div>}
-                      </div>
-                      <div style={{textAlign:'right',flexShrink:0}}>
-                        {a.value > 0 && <div style={{fontSize:13,fontWeight:700,color:'var(--success)'}}>R${Number(a.value).toLocaleString('pt-BR')}</div>}
-                        {a.payment_method && <div style={{fontSize:10,color:'var(--muted)'}}>{a.payment_method}</div>}
-                      </div>
-                    </div>
-                    <div style={{display:'flex',gap:8,marginTop:4,flexWrap:'wrap',alignItems:'center'}}>
-                      <span style={{fontSize:11,color:'var(--muted)'}}>{dt?dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—'}</span>
-                      <span style={{fontSize:10,fontWeight:700,color:STATUS_C[a.status]||'var(--muted)'}}>{a.status}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-</div>
-      </div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:'1px solid #F1F5F9',fontSize:13}}>
+      <span style={{color:'#64748B',fontWeight:500}}>{label}</span>
+      <span style={{color:highlight||'#0B1E3D',fontWeight:600,textAlign:'right',maxWidth:'60%',wordBreak:'break-word'}}>{value}</span>
     </div>
   )
 }
 
-// ── Página principal ──────────────────────────────────────────────────────────
-export default function ClienteDetailPage() {
-  const { id } = useParams()
-  const router  = useRouter()
-  const { salon } = useSalon()
-  const [client,     setClient]     = useState(null)
-  const [microdates, setMicrodates] = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [showMDModal, setShowMDModal] = useState(false)
-  const [editMD,      setEditMD]      = useState(null)
+const DIAS_SEMANA = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
+const FREQUENCIAS = { weekly:'Semanal', biweekly:'Quinzenal', monthly:'Mensal' }
+
+function RecorrenciaCard({ clientId, salonId, clientName, services }) {
+  const [recors,  setRecors]  = useState([])
+  const [adding,  setAdding]  = useState(false)
+  const [form,    setForm]    = useState({ frequency:'biweekly', day_of_week:1, time_slot:'09:00', service_name:'', service_value:'' })
+  const [saving,  setSaving]  = useState(false)
   const sb = createClient()
 
-  const fetchClient = async () => {
-    const { data } = await sb.from('clients').select('*').eq('id', id).single()
-    const { data: appts } = await sb.from('appointments')
-      .select('id,date,service_name,value,status,payment_method,cut_preference,notes')
-      .eq('client_id', id)
-      .order('date', { ascending: false })
-      .limit(20)
-    setClient(data)
-    setLoading(false)
-  }
-  const fetchMicrodates = async () => {
-    const { data } = await sb.from('microdates').select('*').eq('client_id', id).order('date')
-    setMicrodates(data || [])
-  }
-  useEffect(() => { fetchClient(); fetchMicrodates() }, [id])
+  useEffect(() => {
+    if (!clientId||!salonId) return
+    sb.from('recurring_appointments').select('*').eq('client_id',clientId).eq('active',true)
+      .then(({ data }) => setRecors(data||[]))
+  },[clientId])
 
-  const deleteMD = async (mdId) => {
-    if (!confirm('Remover esta microdata?')) return
-    await sb.from('microdates').delete().eq('id', mdId)
-    fetchMicrodates()
-  }
-
-  const updateStatus = async (status) => {
-    await sb.from('clients').update({ status }).eq('id', id)
-    setClient(c => ({ ...c, status }))
-  }
-
-  const st = {
-    page:  { padding:'28px 32px', maxWidth:900 },
-    back:  { fontSize:13, color:'#534AB7', cursor:'pointer', marginBottom:16, display:'flex', alignItems:'center', gap:5, fontWeight:600, border:'none', background:'none', padding:0 },
-    card:  { background:'#fff', borderRadius:16, padding:'20px 24px', border:'1px solid #E3E1F0', marginBottom:16 },
-    hd:    { fontSize:16, fontWeight:800, marginBottom:14, display:'flex', alignItems:'center', gap:6 },
-    label: { fontSize:10, color:'#8A87A0', textTransform:'uppercase', letterSpacing:'.5px', fontWeight:700, marginBottom:3 },
-    val:   { fontSize:14, fontWeight:600, color:'#1A1825' },
-    grid:  { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 },
-    grid2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 },
-    stat:  { textAlign:'center', padding:'14px', background:'#F2F1F8', borderRadius:12 },
-    statV: { fontSize:22, fontWeight:800 },
-    statK: { fontSize:10, color:'#8A87A0', textTransform:'uppercase', letterSpacing:'.5px', marginTop:3 },
-    mdItem:{ display:'flex', gap:12, alignItems:'flex-start', padding:'10px 0', borderBottom:'1px solid #E3E1F0' },
-    mdIco: { width:32, height:32, borderRadius:'50%', background:'#FBEAF0', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16 },
-    addBtn:{ padding:'7px 14px', background:'#534AB7', color:'#fff', border:'none', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer' },
-    actBtn:{ padding:'4px 10px', borderRadius:7, border:'1px solid #E3E1F0', background:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', color:'#8A87A0' },
-    statusBtns: { display:'flex', gap:7, flexWrap:'wrap' },
+  const save = async () => {
+    if (!form.time_slot) return
+    setSaving(true)
+    await sb.from('recurring_appointments').insert({
+      salon_id:salonId, client_id:clientId, frequency:form.frequency,
+      day_of_week:form.day_of_week, time_slot:form.time_slot,
+      service_name:form.service_name, service_value:Number(form.service_value)||0, active:true,
+    })
+    // Gera os próximos 3 meses
+    const appts = []
+    const hoje = new Date(); hoje.setHours(0,0,0,0)
+    const limite = new Date(hoje); limite.setMonth(limite.getMonth()+3)
+    let cur = new Date(hoje)
+    while (cur.getDay()!==Number(form.day_of_week)) cur.setDate(cur.getDate()+1)
+    const step = form.frequency==='weekly'?7:form.frequency==='biweekly'?14:null
+    while (cur<=limite) {
+      appts.push({ salon_id:salonId, client_id:clientId, client_name:clientName,
+        service_name:form.service_name||'Atendimento recorrente',
+        date:`${cur.toISOString().slice(0,10)}T${form.time_slot}:00`,
+        status:'agendado', value:Number(form.service_value)||0, notes:'Recorrente' })
+      if (step) cur.setDate(cur.getDate()+step)
+      else cur.setMonth(cur.getMonth()+1)
+    }
+    if (appts.length) await sb.from('appointments').insert(appts)
+    setSaving(false); setAdding(false)
+    const { data } = await sb.from('recurring_appointments').select('*').eq('client_id',clientId).eq('active',true)
+    setRecors(data||[])
   }
 
-  if (loading) return <div style={{ padding:40, color:'#8A87A0', textAlign:'center' }}>Carregando...</div>
-  if (!client) return <div style={{ padding:40, color:'#8A87A0', textAlign:'center' }}>Cliente não encontrado.</div>
-
-  const cfg = badgeCfg[client.status] || badgeCfg.ativo
+  const INP = {width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E2E8F0',fontSize:13,outline:'none',boxSizing:'border-box',fontFamily:'inherit',color:'#0B1E3D'}
 
   return (
-    <div style={st.page}>
-      <button style={st.back} onClick={()=>router.back()}>← Voltar para clientes</button>
+    <div>
+      {recors.length===0&&!adding&&(
+        <div style={{textAlign:'center',color:'#94A3B8',padding:'12px 0',fontSize:12}}>Nenhuma recorrência configurada.</div>
+      )}
+      {recors.map(r=>(
+        <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:'1px solid #F1F5F9'}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'#0B1E3D'}}>{r.service_name||'Atendimento'}</div>
+            <div style={{fontSize:11,color:'#64748B'}}>{FREQUENCIAS[r.frequency]} · {DIAS_SEMANA[r.day_of_week]} às {r.time_slot?.slice(0,5)}{r.service_value>0&&<span style={{color:'#059669',fontWeight:700,marginLeft:6}}>R${r.service_value}</span>}</div>
+          </div>
+          <button onClick={async()=>{ await sb.from('recurring_appointments').update({active:false}).eq('id',r.id); setRecors(x=>x.filter(i=>i.id!==r.id)) }}
+            style={{padding:'4px 10px',borderRadius:7,border:'1px solid #E2E8F0',background:'#F8FAFC',color:'#94A3B8',fontSize:11,fontWeight:600,cursor:'pointer'}}>
+            Cancelar
+          </button>
+        </div>
+      ))}
 
-      {/* Header do cliente */}
-      <div style={{ ...st.card, display:'flex', alignItems:'flex-start', gap:20, marginBottom:16 }}>
-        <Av color={client.avatar_color} sz={64} name={client.name} />
-        <div style={{ flex:1 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-            <div style={{ fontSize:22, fontWeight:800 }}>{client.name}</div>
-            <span style={{ fontSize:12, padding:'3px 10px', borderRadius:20, fontWeight:700, background:cfg.bg, color:cfg.color }}>{cfg.label}</span>
-          </div>
-          <div style={{ fontSize:13, color:'#8A87A0', marginTop:3 }}>
-            {client.phone && <span>📱 {client.phone} · </span>}
-            {client.email && <span>✉️ {client.email} · </span>}
-            <span>Canal: {client.canal}</span>
-          </div>
-          {client.notes && <div style={{ fontSize:12, color:'#8A87A0', marginTop:6, fontStyle:'italic' }}>"{client.notes}"</div>}
-          <div style={{ display:'flex', gap:6, marginTop:12, flexWrap:'wrap' }}>
-            {client.phone && (
-              <a href={`https://wa.me/55${client.phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer">
-                <button style={{ ...st.addBtn, background:'#1D9E75', display:'flex', alignItems:'center', gap:5 }}>💬 WhatsApp</button>
-              </a>
-            )}
-            <div style={st.statusBtns}>
-              {['ativo','em_risco','inativo'].map(s=>(
-                <button key={s} onClick={()=>updateStatus(s)} style={{
-                  ...st.actBtn,
-                  background: client.status===s ? badgeCfg[s]?.bg : '#fff',
-                  color: client.status===s ? badgeCfg[s]?.color : '#8A87A0',
-                  borderColor: client.status===s ? badgeCfg[s]?.color : '#E3E1F0',
-                  fontWeight: client.status===s ? 700 : 600,
-                }}>{badgeCfg[s]?.label}</button>
-              ))}
+      {!adding&&(
+        <button onClick={()=>setAdding(true)}
+          style={{marginTop:12,width:'100%',padding:'9px',borderRadius:10,border:'1.5px dashed #CBD5E1',background:'#F8FAFC',color:'#64748B',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+          + Adicionar recorrência
+        </button>
+      )}
+
+      {adding&&(
+        <div style={{marginTop:12,padding:'14px',background:'#F8FAFC',borderRadius:12,border:'1px solid #E2E8F0'}}>
+          <div style={{fontSize:13,fontWeight:800,color:'#0B1E3D',marginBottom:12}}>Nova recorrência</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',display:'block',marginBottom:4}}>Frequência</label>
+              <select style={INP} value={form.frequency} onChange={e=>setForm(f=>({...f,frequency:e.target.value}))}>
+                {Object.entries(FREQUENCIAS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',display:'block',marginBottom:4}}>Dia da semana</label>
+              <select style={INP} value={form.day_of_week} onChange={e=>setForm(f=>({...f,day_of_week:Number(e.target.value)}))}>
+                {DIAS_SEMANA.map((d,i)=><option key={i} value={i}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',display:'block',marginBottom:4}}>Horário</label>
+              <input type="time" style={INP} value={form.time_slot} onChange={e=>setForm(f=>({...f,time_slot:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',display:'block',marginBottom:4}}>Serviço</label>
+              <input style={INP} placeholder="Ex: Corte" value={form.service_name} onChange={e=>setForm(f=>({...f,service_name:e.target.value}))}/>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',display:'block',marginBottom:4}}>Valor (R$)</label>
+              <input type="number" style={INP} placeholder="0" value={form.service_value} onChange={e=>setForm(f=>({...f,service_value:e.target.value}))}/>
             </div>
           </div>
+          <div style={{fontSize:10,color:'#94A3B8',marginTop:8,marginBottom:12}}>Gera agendamentos para os próximos 3 meses automaticamente.</div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={save} disabled={saving}
+              style={{flex:1,padding:'9px',borderRadius:9,border:'none',background:'#0B1E3D',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              {saving?'Gerando...':'Criar recorrência'}
+            </button>
+            <button onClick={()=>setAdding(false)}
+              style={{padding:'9px 14px',borderRadius:9,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:12,cursor:'pointer'}}>
+              Cancelar
+            </button>
+          </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+export default function ClientePerfilPage() {
+  const params = useParams()
+  const { id }  = params
+  const router  = useRouter()
+  const { salon, isBarber, barberData } = useSalon()
+  const [client,  setClient]  = useState(null)
+  const [appts,   setAppts]   = useState([])
+  const [barber,  setBarber]  = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [form,    setForm]    = useState({})
+  const [saving,  setSaving]  = useState(false)
+  const [tab,     setTab]     = useState('perfil')
+  const sb = createClient()
+
+  const load = async () => {
+    const [{ data:cl },{ data:ap }] = await Promise.all([
+      sb.from('clients').select('*').eq('id', id).single(),
+      sb.from('appointments').select('*').eq('client_id', id).order('date',{ascending:false}).limit(20),
+    ])
+    setClient(cl); setAppts(ap||[])
+    setForm(cl||{})
+    if (cl?.last_barber_id) {
+      const { data:br } = await sb.from('barbers').select('id,name,color').eq('id',cl.last_barber_id).single()
+      setBarber(br||null)
+    }
+  }
+  useEffect(() => { if (id) load() }, [id])
+
+  const save = async () => {
+    setSaving(true)
+    await sb.from('clients').update(form).eq('id', id)
+    await load(); setSaving(false); setEditing(false)
+  }
+
+  if (!client) return (
+    <div className="pg" style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:300}}>
+      <div style={{color:'#94A3B8',fontSize:14}}>Carregando...</div>
+    </div>
+  )
+
+  const phone    = (client.phone||'').replace(/\D/g,'')
+  const cfg      = STATUS_CFG[client.status||'ativo']||STATUS_CFG.ativo
+  const totalLTV = appts.filter(a=>a.status==='concluido').reduce((s,a)=>s+(a.value||0),0)
+  const visitas  = appts.filter(a=>a.status==='concluido').length
+
+  const TABS = [['perfil','Ficha'],['historico','Histórico'],['recorrencia','Recorrência']]
+
+  return (
+    <div className="pg">
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
+        <button onClick={()=>router.back()}
+          style={{padding:'6px 12px',borderRadius:8,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+          ← Clientes
+        </button>
       </div>
 
-      {/* Estatísticas */}
-      <div style={{ ...st.card }}>
-        <div style={st.hd}>📈 Estatísticas</div>
-        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+      {/* Cartão de identidade do cliente */}
+      <div style={{background:'linear-gradient(135deg,#0B1E3D 0%,#1E3A6E 100%)',borderRadius:20,padding:'24px',marginBottom:16,position:'relative',overflow:'hidden'}}>
+        {/* Pattern decorativo */}
+        <div style={{position:'absolute',top:-30,right:-30,width:120,height:120,borderRadius:60,background:'rgba(255,255,255,.04)'}}/>
+        <div style={{position:'absolute',bottom:-20,right:40,width:80,height:80,borderRadius:40,background:'rgba(255,255,255,.03)'}}/>
+
+        <div style={{display:'flex',gap:14,alignItems:'flex-start',position:'relative'}}>
+          <Avatar name={client.name} color={client.avatar_color||'#1B3057'} size={60}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:20,fontWeight:800,color:'#fff',marginBottom:4}}>{client.name}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+              <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,
+                background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.bd}`}}>
+                {cfg.label}
+              </span>
+              {barber&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,background:barber.color||'#1B3057',color:'#fff'}}>
+                ✂️ {barber.name?.split(' ')[0]}
+              </span>}
+            </div>
+            {phone&&<div style={{fontSize:12,color:'rgba(255,255,255,.6)',marginBottom:2}}>📱 {client.phone}</div>}
+            {client.email&&<div style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>✉️ {client.email}</div>}
+          </div>
+          {!isBarber&&(
+            <button onClick={()=>setEditing(!editing)}
+              style={{padding:'7px 14px',borderRadius:9,border:'1px solid rgba(255,255,255,.2)',background:'rgba(255,255,255,.1)',color:'rgba(255,255,255,.8)',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>
+              {editing?'Cancelar':'Editar'}
+            </button>
+          )}
+        </div>
+
+        {/* KPIs rápidos */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:16}}>
           {[
-            ['LTV acumulado', `R$${Number(client.ltv||0).toLocaleString('pt-BR',{minimumFractionDigits:0})}`, '#534AB7'],
-            ['Visitas', client.visit_count||0, '#1D9E75'],
-            ['Última visita', client.last_visit ? new Date(client.last_visit+'T00:00').toLocaleDateString('pt-BR') : '—', '#8A87A0'],
-            ['1ª visita', client.first_visit ? new Date(client.first_visit+'T00:00').toLocaleDateString('pt-BR') : '—', '#8A87A0'],
-            ['Serviço principal', client.main_service||'—', '#BA7517'],
-            ['Estratégia', client.strategy||'Nenhuma', client.strategy?'#534AB7':'#8A87A0'],
-          ].map(([k,v,c])=>(
-            <div key={k} style={{ ...st.stat, flex:'1 1 130px' }}>
-              <div style={{ ...st.statV, color:c, fontSize:v.toString().length>6?15:22 }}>{v}</div>
-              <div style={st.statK}>{k}</div>
+            ['Visitas', visitas||client.visit_count||0, '#6EE7B7'],
+            ['LTV Total', `R$${(totalLTV||client.ltv||0).toLocaleString('pt-BR')}`, '#FCD34D'],
+            ['Última visita', client.last_visit?new Date(client.last_visit+'T00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'—', 'rgba(255,255,255,.6)'],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{textAlign:'center'}}>
+              <div style={{fontSize:16,fontWeight:800,color:c}}>{v}</div>
+              <div style={{fontSize:9,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.5px',marginTop:2}}>{l}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Microdatas */}
-      <div style={st.card}>
-        <div style={{ ...st.hd, justifyContent:'space-between' }}>
-          <span>🎯 Microdatas pessoais</span>
-          <button style={st.addBtn} onClick={()=>{ setEditMD(null); setShowMDModal(true) }}>+ Adicionar</button>
-        </div>
-        {microdates.length === 0 ? (
-          <div style={{ fontSize:13, color:'#8A87A0', textAlign:'center', padding:'16px 0' }}>
-            Nenhuma microdata cadastrada. Adicione datas importantes como aniversários, eventos e reuniões.
-          </div>
-        ) : microdates.map(m => {
-          const dt = new Date(m.date+'T00:00')
-          const today = new Date()
-          const diff  = Math.ceil((dt - today) / (1000*60*60*24))
-          const past  = diff < 0
-          return (
-            <div key={m.id} style={{ ...st.mdItem, opacity: past ? 0.55 : 1 }}>
-              <div style={{ ...st.mdIco, background: past ? '#F0EFF8' : '#FBEAF0' }}>
-                {typeIcon[m.type]||'📌'}
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700 }}>{m.title}</div>
-                {m.description && <div style={{ fontSize:11, color:'#8A87A0', marginTop:2 }}>{m.description}</div>}
-                <div style={{ fontSize:11, marginTop:3, fontWeight:700, color: past ? '#8A87A0' : diff <= 7 ? '#D85A30' : '#534AB7' }}>
-                  {dt.toLocaleDateString('pt-BR')}
-                  {!past && ` · em ${diff} dia${diff!==1?'s':''}`}
-                  {past && ' · passada'}
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                <button style={st.actBtn} onClick={()=>{ setEditMD(m); setShowMDModal(true) }}>Editar</button>
-                <button style={{ ...st.actBtn, color:'#D85A30', borderColor:'#F5C4B3' }} onClick={()=>deleteMD(m.id)}>✕</button>
-              </div>
-            </div>
-          )
-        })}
+      {/* Tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:14,background:'#F1F5F9',borderRadius:12,padding:4}}>
+        {TABS.map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)}
+            style={{flex:1,padding:'8px',borderRadius:9,border:'none',fontSize:12,fontWeight:700,cursor:'pointer',
+              background:tab===k?'#fff':'transparent',color:tab===k?'#0B1E3D':'#64748B',
+              boxShadow:tab===k?'0 1px 4px rgba(0,0,0,.08)':'none',transition:'all .15s'}}>
+            {l}
+          </button>
+        ))}
       </div>
 
-      {/* Modal microdata */}
-      {showMDModal && salon && (
-        <MicrodataModal
-          clientId={id}
-          salonId={salon.id}
-          microdata={editMD}
-          onClose={()=>setShowMDModal(false)}
-          onSaved={fetchMicrodates}
-        />
+      {/* Tab: Ficha */}
+      {tab==='perfil'&&(
+        <div>
+          <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:'18px',marginBottom:14}}>
+            <div style={{fontSize:14,fontWeight:800,color:'#0B1E3D',marginBottom:12}}>Dados pessoais</div>
+            {editing ? (
+              <div>
+                {[
+                  ['Nome *','name','text','Nome completo'],
+                  ['WhatsApp','phone','tel','(31) 99999-0000'],
+                  ['E-mail','email','email','email@...'],
+                  ['Aniversário','birth_date','date',''],
+                ].map(([l,k,t,p])=>(
+                  <div key={k} style={{marginBottom:10}}>
+                    <label style={{display:'block',fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>{l}</label>
+                    <input type={t} placeholder={p} value={form[k]||''}
+                      onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                      style={{width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E2E8F0',fontSize:14,outline:'none',boxSizing:'border-box',fontFamily:'inherit',color:'#0B1E3D'}}/>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <InfoRow label="Telefone" value={client.phone}/>
+                <InfoRow label="E-mail" value={client.email}/>
+                <InfoRow label="Aniversário" value={client.birth_date?new Date(client.birth_date+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'}):null}/>
+                <InfoRow label="Primeira visita" value={client.first_visit?new Date(client.first_visit+'T00:00').toLocaleDateString('pt-BR'):null}/>
+                <InfoRow label="Como nos encontrou" value={client.referral_source}/>
+              </div>
+            )}
+          </div>
+
+          <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:'18px',marginBottom:14}}>
+            <div style={{fontSize:14,fontWeight:800,color:'#0B1E3D',marginBottom:12}}>Preferências e perfil ✂️</div>
+            {editing ? (
+              <div>
+                {[
+                  ['Tipo de corte preferido','preferred_cut','Degradê na lateral, franja longa...'],
+                  ['Alergias / Restrições','allergies','Ex: alergia a amônia...'],
+                  ['Notas internas','notes_internal','Observações para a equipe...'],
+                ].map(([l,k,p])=>(
+                  <div key={k} style={{marginBottom:10}}>
+                    <label style={{display:'block',fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>{l}</label>
+                    <textarea placeholder={p} value={form[k]||''} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                      style={{width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E2E8F0',fontSize:13,outline:'none',boxSizing:'border-box',fontFamily:'inherit',color:'#0B1E3D',resize:'none',minHeight:60}}/>
+                  </div>
+                ))}
+                <div style={{marginBottom:10}}>
+                  <label style={{display:'block',fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Status</label>
+                  <select value={form.status||'ativo'} onChange={e=>setForm(f=>({...f,status:e.target.value}))}
+                    style={{width:'100%',padding:'9px 12px',borderRadius:9,border:'1px solid #E2E8F0',fontSize:13,outline:'none',boxSizing:'border-box',fontFamily:'inherit',color:'#0B1E3D'}}>
+                    <option value="ativo">Ativo</option>
+                    <option value="em_risco">Em risco</option>
+                    <option value="inativo">Inativo</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {client.preferred_cut ? (
+                  <div style={{padding:'10px 14px',background:'#F8FAFC',borderRadius:10,border:'1px solid #E2E8F0',marginBottom:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Tipo de corte</div>
+                    <div style={{fontSize:13,color:'#0B1E3D',fontWeight:600}}>{client.preferred_cut}</div>
+                  </div>
+                ) : <div style={{fontSize:12,color:'#94A3B8',marginBottom:10}}>Nenhuma preferência registrada.</div>}
+                {client.allergies&&(
+                  <div style={{padding:'10px 14px',background:'#FEF3C7',borderRadius:10,border:'1px solid #FCD34D',marginBottom:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#92400E',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>⚠️ Alergias / Atenção</div>
+                    <div style={{fontSize:13,color:'#92400E',fontWeight:600}}>{client.allergies}</div>
+                  </div>
+                )}
+                {client.notes_internal&&(
+                  <div style={{padding:'10px 14px',background:'#EFF6FF',borderRadius:10,border:'1px solid #93C5FD'}}>
+                    <div style={{fontSize:10,fontWeight:700,color:'#1E40AF',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>📋 Notas internas</div>
+                    <div style={{fontSize:13,color:'#1E3A5F'}}>{client.notes_internal}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Ações de comunicação */}
+          {phone&&(
+            <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:'18px',marginBottom:14}}>
+              <div style={{fontSize:14,fontWeight:800,color:'#0B1E3D',marginBottom:12}}>Comunicação</div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {[
+                  ['💬 Enviar mensagem','',`https://wa.me/55${phone}`,'#E2E8F0','#64748B'],
+                  ['📅 Lembrar de remarcar','',`https://wa.me/55${phone}?text=${encodeURIComponent(`Olá ${client.name?.split(' ')[0]}! 👋 Que tal agendar um horário no ${salon?.name}? 😊`)}` ,'#DBEAFE','#2451A0'],
+                  ['🎂 Mensagem de aniversário','',`https://wa.me/55${phone}?text=${encodeURIComponent(`Feliz aniversário, ${client.name?.split(' ')[0]}! 🎉 O time do ${salon?.name} deseja um dia incrível! 🎁`)}`,'#FEF3C7','#D97706'],
+                ].map(([l,,href,bg,color])=>(
+                  <a key={l} href={href} target="_blank" rel="noreferrer"
+                    style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,border:`1px solid ${bg}`,background:bg,color,fontSize:12,fontWeight:700,textDecoration:'none'}}>
+                    {l}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {editing&&(
+            <div style={{display:'flex',gap:8,marginTop:4}}>
+              <button onClick={save} disabled={saving}
+                style={{flex:1,padding:'13px',borderRadius:12,border:'none',background:'#0B1E3D',color:'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>
+                {saving?'Salvando...':'Salvar alterações'}
+              </button>
+              <button onClick={()=>{ setEditing(false); setForm(client) }}
+                style={{padding:'13px 18px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Histórico */}
+      {tab==='historico'&&(
+        <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',overflow:'hidden'}}>
+          <div style={{padding:'14px 16px',borderBottom:'2px solid #E2E8F0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{fontSize:14,fontWeight:800,color:'#0B1E3D'}}>Histórico de atendimentos</div>
+            <div style={{fontSize:12,color:'#64748B'}}>{appts.length} registro{appts.length!==1?'s':''}</div>
+          </div>
+          {appts.length===0 ? (
+            <div style={{padding:32,textAlign:'center',color:'#94A3B8',fontSize:13}}>Nenhum atendimento registrado.</div>
+          ) : appts.map((a,i)=>{
+            const dt = a.date?new Date(a.date):null
+            const cfa = STATUS_A[a.status]||'#94A3B8'
+            return (
+              <div key={a.id} style={{display:'flex',gap:12,padding:'12px 16px',borderBottom:i<appts.length-1?'1px solid #F1F5F9':'none',alignItems:'flex-start'}}>
+                <div style={{width:40,textAlign:'center',background:a.status==='concluido'?'#D1FAE5':'#F1F5F9',borderRadius:8,padding:'5px 0',flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:cfa}}>{dt?dt.getDate():'—'}</div>
+                  <div style={{fontSize:8,color:'#94A3B8',fontWeight:700}}>{dt?MESES[dt.getMonth()]:''}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:4}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#0B1E3D'}}>{a.service_name||'Atendimento'}</div>
+                    {a.value>0&&<div style={{fontSize:13,fontWeight:800,color:'#059669'}}>R${Number(a.value).toLocaleString('pt-BR')}</div>}
+                  </div>
+                  <div style={{display:'flex',gap:8,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
+                    {dt&&<span style={{fontSize:11,color:'#94A3B8'}}>{dt.toLocaleDateString('pt-BR')} {String(dt.getHours()).padStart(2,'0')}:{String(dt.getMinutes()).padStart(2,'0')}</span>}
+                    <span style={{fontSize:10,fontWeight:700,color:cfa}}>{a.status}</span>
+                    {a.payment_method&&<span style={{fontSize:10,color:'#94A3B8'}}>{a.payment_method}</span>}
+                    {a.cut_preference&&<span style={{fontSize:10,color:'#64748B'}}>✂️ {a.cut_preference}</span>}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Tab: Recorrência */}
+      {tab==='recorrencia'&&(
+        <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:'18px'}}>
+          <div style={{fontSize:14,fontWeight:800,color:'#0B1E3D',marginBottom:4}}>Agendamentos recorrentes</div>
+          <div style={{fontSize:12,color:'#64748B',marginBottom:14}}>Configure horários fixos gerados automaticamente</div>
+          <RecorrenciaCard clientId={id} salonId={salon?.id} clientName={client?.name}/>
+        </div>
       )}
     </div>
   )
