@@ -199,7 +199,7 @@ export default function DashboardLayout({ children }) {
             <span style={{ width: 20 }} />
           </button>
 
-          {/* Logo no header — mobile only */}
+          {/* Logo centralizada no header — mobile only */}
           <div className="header-logo-wrap">
             <img
               src="/logo-full.svg"
@@ -208,18 +208,17 @@ export default function DashboardLayout({ children }) {
             />
           </div>
 
+          {/* Título da página — desktop only */}
           <div className="header-title">
             <curNav.Icon size={14} style={{ marginRight: 6, flexShrink: 0 }} />
             {curNav.label}
           </div>
 
+          {/* Lado direito: só badge admin se aplicável */}
           <div className="header-actions">
             {isAdmin && !maintenanceMode && (
               <Link href="/admin" className="header-admin-badge">Admin</Link>
             )}
-            <div className="header-avatar">
-              {salon?.name?.charAt(0)?.toUpperCase() || 'M'}
-            </div>
           </div>
         </header>
 
