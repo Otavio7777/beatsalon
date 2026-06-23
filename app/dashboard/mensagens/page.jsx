@@ -29,6 +29,11 @@ const TIPOS = [
     default:'Oi {nome}! 👋 Lembrando do seu horário amanhã às *{hora}* para *{servico}* em {salao}.\n\nEstamos te esperando! Caso precise reagendar, avisa com antecedência. 😊',
     vars:['{nome}','{salao}','{servico}','{hora}'],
   },
+
+  { id:'segmento', label:'Enviar por segmento', desc:'Selecione clientes e envie mensagens personalizadas com dados reais', icon:'📤',
+    default:'Olá {nome}! Temos novidades especiais para você em {salao}. Que tal agendar? {link}',
+    vars:['{nome}','{salao}','{link}'],
+  },
   {
     id:'pos_atendimento',
     label:'Mensagem pós-atendimento',
@@ -58,9 +63,28 @@ export default function MensagensPage() {
   const [active,  setActive]  = useState({})
   const [saving,  setSaving]  = useState(false)
   const [saved,   setSaved]   = useState(false)
+  const [clientesSeg, setClientesSeg] = useState([])
+  const [loadingCli, setLoadingCli]   = useState(false)
+  const [selectedCli, setSelectedCli] = useState([])
   const sb = createClient()
 
   const tipo = TIPOS.find(t=>t.id===tab)
+
+  // Carrega clientes para envio segmentado
+  const loadClientes = async () => {
+    if (!salon?.id) return
+    setLoadingCli(true)
+    const { data } = await sb.from('clients')
+      .select('id,name,phone,status,last_visit,visit_count,birth_date')
+      .eq('salon_id', salon.id)
+      .order('name')
+    setClientesSeg(data||[])
+    setLoadingCli(false)
+  }
+
+  useEffect(() => {
+    if (tab === 'segmento') loadClientes()
+  },[tab, salon?.id])
 
   useEffect(() => {
     if (!salon?.id) return
@@ -163,6 +187,52 @@ export default function MensagensPage() {
               </button>
             </div>
 
+
+            {/* Envio por segmento */}
+            {tab === 'segmento' && (
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:10}}>
+                  Selecionar destinatários
+                </div>
+                {loadingCli
+                  ? <div style={{color:'var(--muted)',fontSize:13}}>Carregando clientes...</div>
+                  : (
+                    <div style={{maxHeight:220,overflowY:'auto',border:'1px solid var(--border)',borderRadius:10}}>
+                      {clientesSeg.length===0
+                        ? <div style={{padding:16,textAlign:'center',color:'var(--muted)',fontSize:13}}>Nenhum cliente cadastrado.</div>
+                        : clientesSeg.map(cl => {
+                          const sel = selectedCli.includes(cl.id)
+                          const phone = cl.phone?.replace(/\D/g,'')
+                          const hasPhone = phone?.length >= 10
+                          return (
+                            <div key={cl.id} onClick={()=>hasPhone&&setSelectedCli(p=>sel?p.filter(x=>x!==cl.id):[...p,cl.id])}
+                              style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderBottom:'1px solid var(--gray-100)',cursor:hasPhone?'pointer':'not-allowed',background:sel?'var(--navy-50)':hasPhone?'transparent':'#FAFAFA',opacity:hasPhone?1:.5}}>
+                              <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${sel?'var(--navy-600)':'var(--border)'}`,background:sel?'var(--navy-600)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                                {sel&&<span style={{color:'#fff',fontSize:10,fontWeight:800}}>✓</span>}
+                              </div>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{cl.name}</div>
+                                <div style={{fontSize:11,color:'var(--muted)'}}>{hasPhone?`(${phone.slice(0,2)}) ${phone.slice(2)}`:'Sem telefone'} · {cl.visit_count||0} visitas</div>
+                              </div>
+                              <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,fontWeight:600,background:cl.status==='ativo'?'var(--success-light)':'var(--gray-100)',color:cl.status==='ativo'?'var(--success)':'var(--muted)'}}>{cl.status||'ativo'}</span>
+                            </div>
+                          )
+                        })
+                      }
+                    </div>
+                  )
+                }
+                {selectedCli.length>0 && (
+                  <div style={{marginTop:12,padding:'10px 14px',background:'var(--navy-50)',borderRadius:10,border:'1px solid var(--navy-200)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                    <div style={{fontSize:12,color:'var(--navy-700)',fontWeight:600}}>{selectedCli.length} cliente{selectedCli.length!==1?'s':''} selecionado{selectedCli.length!==1?'s':''}</div>
+                    <a href={`https://wa.me/?text=${encodeURIComponent(previewText(texts[tab]||tipo?.default||''))}`} target="_blank" rel="noreferrer"
+                      style={{display:'inline-flex',alignItems:'center',gap:7,padding:'8px 14px',background:'#25D366',borderRadius:9,color:'#fff',fontSize:12,fontWeight:700,textDecoration:'none'}}>
+                      💬 Abrir WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Variáveis disponíveis */}
             <div style={{marginBottom:10}}>
               <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Variáveis disponíveis</div>
