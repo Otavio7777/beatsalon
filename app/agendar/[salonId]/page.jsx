@@ -112,6 +112,21 @@ function gerarSlots(schedCfg, date) {
 export default function AgendarPage({ params }) {
   const { salonId } = params
   const sb = createClient()
+  const [barberId,    setBarberId]    = useState(null)
+  const [barberInfo,  setBarberInfo]  = useState(null)
+
+  // Lê barbeiro da URL se houver
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const bid = params.get('barber')
+      if (bid) {
+        setBarberId(bid)
+        sb.from('barbers').select('id,name,color,avatar_url').eq('id',bid).eq('active',true).single()
+          .then(({ data }) => setBarberInfo(data||null))
+      }
+    }
+  }, [])
 
   // Dados do salão
   const [salon,       setSalon]       = useState(null)
@@ -237,6 +252,7 @@ export default function AgendarPage({ params }) {
           name: nome.trim(),
           phone: phoneClean,
           referral_source: origem||null,
+          last_barber_id: barberId||null,
           first_visit: dataSel,
           status: 'ativo',
           visit_count: 0, ltv: 0,
@@ -255,6 +271,7 @@ export default function AgendarPage({ params }) {
         value: total,
         notes: `${phoneClean}${obs?' | '+obs:''}`,
         cut_preference: cutPref.trim()||null,
+        barber_id: barberId||null,
       }).select().single()
 
       setResultado({ ap, svNomes, total, dataSel, horaSel })
@@ -323,6 +340,10 @@ export default function AgendarPage({ params }) {
       <div style={{background:'#0B1E3D',padding:'20px 20px 14px',textAlign:'center'}}>
         {salon.logo_url&&<img src={salon.logo_url} style={{width:56,height:56,borderRadius:28,objectFit:'cover',marginBottom:8}}/>}
         <div style={{fontFamily:'Dancing Script,cursive',fontSize:24,color:'#fff',fontWeight:700}}>{salon.name||'Meu Salão'}</div>
+        {barberInfo&&<div style={{marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+          <div style={{width:28,height:28,borderRadius:14,background:barberInfo.color||'#1B3057',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800}}>{barberInfo.name?.charAt(0).toUpperCase()}</div>
+          <span style={{fontSize:12,color:'rgba(255,255,255,.7)',fontWeight:600}}>com {barberInfo.name}</span>
+        </div>}
         <div style={{fontFamily:'Dancing Script,cursive',fontSize:12,color:'rgba(255,255,255,.4)'}}>Agendamento online</div>
       </div>
 
