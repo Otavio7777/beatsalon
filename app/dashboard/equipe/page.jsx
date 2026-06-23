@@ -116,7 +116,8 @@ export default function EquipePage() {
 
   const cancelForm = () => { setAdding(false); setEditing(null); setForm({ name:'', email:'', phone:'', role:'barber', commission_type:'percentage', commission_value:40, color:'#1B3057' }) }
 
-  const accessLink = (b) => `${typeof window!=='undefined'?window.location.origin:''}/barber/setup?salon=${salon?.id}&email=${encodeURIComponent(b.email)}&name=${encodeURIComponent(b.name)}`
+  const setupLink  = (b) => `${typeof window!=='undefined'?window.location.origin:''}/barber/setup?salon=${salon?.id}&email=${encodeURIComponent(b.email||'')}&name=${encodeURIComponent(b.name)}`
+  const bookingLink = (b) => `${typeof window!=='undefined'?window.location.origin:''}/agendar/${salon?.id}?barber=${b.id}`
 
   if (!salon) return <div className="pg" style={{color:'var(--muted)',textAlign:'center',padding:40}}>Carregando...</div>
 
@@ -303,20 +304,37 @@ export default function EquipePage() {
                       {b.phone&&<span style={{marginRight:10}}>📱 {b.phone}</span>}
                       <span style={{color:'var(--navy-500)',fontWeight:600}}>Comissão: {commLabel}</span>
                     </div>
-                    {/* Link de acesso */}
-                    {b.active && b.email && !b.user_id && (
-                      <div style={{marginTop:8,padding:'8px 12px',background:'var(--navy-50)',borderRadius:9,border:'1px solid var(--navy-200)'}}>
-                        <div style={{fontSize:11,fontWeight:700,color:'var(--navy-700)',marginBottom:4}}>🔗 Link de acesso — envie para o barbeiro:</div>
-                        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                          <code style={{fontSize:10,color:'var(--navy-600)',flex:1,wordBreak:'break-all',background:'#fff',padding:'4px 8px',borderRadius:6,border:'1px solid var(--navy-200)'}}>
-                            {link}
-                          </code>
-                          <button onClick={()=>{ navigator.clipboard?.writeText(link); showMsg(true,'Link copiado!') }}
-                            style={{padding:'4px 10px',borderRadius:7,border:'1px solid var(--navy-200)',background:'var(--navy-600)',color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>
-                            Copiar
-                          </button>
+                    {/* Links do barbeiro */}
+                    {b.active && (
+                      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
+                        {/* Link de agendamento personalizado */}
+                        <div style={{padding:'8px 12px',background:'#ECFDF5',borderRadius:9,border:'1px solid #6EE7B7'}}>
+                          <div style={{fontSize:11,fontWeight:700,color:'#065F46',marginBottom:4}}>✂️ Link de agendamento pessoal:</div>
+                          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                            <code style={{fontSize:10,color:'#065F46',flex:1,wordBreak:'break-all',background:'#fff',padding:'4px 8px',borderRadius:6,border:'1px solid #6EE7B7'}}>
+                              {bookingLink(b)}
+                            </code>
+                            <button onClick={()=>{ navigator.clipboard?.writeText(bookingLink(b)); showMsg(true,'Link de agendamento copiado!') }}
+                              style={{padding:'4px 10px',borderRadius:7,border:'1px solid #6EE7B7',background:'#059669',color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>
+                              Copiar
+                            </button>
+                          </div>
                         </div>
-                        <div style={{fontSize:10,color:'var(--muted)',marginTop:4}}>O barbeiro usará este link para criar sua senha e acessar o sistema.</div>
+                        {/* Link de setup (login) — só se ainda não configurou */}
+                        {b.email && !b.user_id && (
+                          <div style={{padding:'8px 12px',background:'var(--navy-50)',borderRadius:9,border:'1px solid var(--navy-200)'}}>
+                            <div style={{fontSize:11,fontWeight:700,color:'var(--navy-700)',marginBottom:4}}>🔑 Link para criar senha (envie UMA vez):</div>
+                            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                              <code style={{fontSize:10,color:'var(--navy-600)',flex:1,wordBreak:'break-all',background:'#fff',padding:'4px 8px',borderRadius:6,border:'1px solid var(--navy-200)'}}>
+                                {setupLink(b)}
+                              </code>
+                              <button onClick={()=>{ navigator.clipboard?.writeText(setupLink(b)); showMsg(true,'Link copiado!') }}
+                                style={{padding:'4px 10px',borderRadius:7,border:'1px solid var(--navy-200)',background:'var(--navy-600)',color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer',flexShrink:0}}>
+                                Copiar
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     {b.user_id && (
