@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 import { useSalon } from '../../lib/useSalon'
@@ -101,13 +100,10 @@ export default function DashboardLayout({ children }) {
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-inner">
-            <Image
+            <img
               src="/logo-full.svg"
               alt="Meu Salão"
-              width={140}
-              height={38}
               className="sidebar-logo-img"
-              priority
             />
           </div>
           {isMobile && (
@@ -205,13 +201,10 @@ export default function DashboardLayout({ children }) {
 
           {/* Logo no header — mobile only */}
           <div className="header-logo-wrap">
-            <Image
+            <img
               src="/logo-full.svg"
               alt="Meu Salão"
-              width={100}
-              height={27}
               className="header-logo-img"
-              priority
             />
           </div>
 
