@@ -575,6 +575,8 @@ export default function AgendaPage() {
   const [remarcarModal,  setRemarcarModal]  = useState(null)
   const [currDate, setCurrDate] = useState(()=>today())
   const [view, setView]       = useState('hoje')
+  const [barbers,  setBarbers]    = useState([])
+  const [barberFiltro, setBarberFiltro] = useState('todos')
   const [showModal, setShowModal] = useState(false)
   const [editAppt, setEditAppt]  = useState(null)
   const sb = createClient()
@@ -716,6 +718,23 @@ export default function AgendaPage() {
 
       {/* Lista */}
 
+
+      {/* Filtro por barbeiro */}
+      {barbers.length > 0 && (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+          <button onClick={()=>setBarberFiltro('todos')}
+            style={{padding:'5px 12px',borderRadius:20,border:`1.5px solid ${barberFiltro==='todos'?'#0B1E3D':'#E2E8F0'}`,background:barberFiltro==='todos'?'#0B1E3D':'#fff',color:barberFiltro==='todos'?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:'pointer'}}>
+            Todos
+          </button>
+          {barbers.map(b=>(
+            <button key={b.id} onClick={()=>setBarberFiltro(b.id)}
+              style={{padding:'5px 12px',borderRadius:20,border:`1.5px solid ${barberFiltro===b.id?b.color||'#1B3057':'#E2E8F0'}`,background:barberFiltro===b.id?b.color||'#1B3057':'#fff',color:barberFiltro===b.id?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+              <div style={{width:8,height:8,borderRadius:4,background:b.color||'#1B3057',opacity:barberFiltro===b.id?0:1}}/>
+              {b.name?.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Hoje */}
       {(view==='hoje'||view==='amanha') && (() => {
         const targetDate = view==='hoje' ? new Date() : (() => { const d=new Date(); d.setDate(d.getDate()+1); return d })()
