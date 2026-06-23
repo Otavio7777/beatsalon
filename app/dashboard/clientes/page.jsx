@@ -164,7 +164,7 @@ export default function ClientesPage() {
     if (!salon?.id) return
     setLoading(true)
     const [{ data:cl },{ data:ap }] = await Promise.all([
-      sb.from('clients').select('*').eq('salon_id',salon.id).order('name'),
+      sb.from('clients').select('*, barbers!clients_last_barber_id_fkey(id,name,color)').eq('salon_id',salon.id).order('name'),
       sb.from('appointments').select('id,client_id,service_name,date,status').eq('salon_id',salon.id)
         .gte('date',new Date().toISOString()).in('status',['agendado']).order('date'),
     ])
