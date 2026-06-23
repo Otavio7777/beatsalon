@@ -112,21 +112,6 @@ function gerarSlots(schedCfg, date) {
 export default function AgendarPage({ params }) {
   const { salonId } = params
   const sb = createClient()
-  const [barberId,    setBarberId]    = useState(null)
-  const [barberInfo,  setBarberInfo]  = useState(null)
-
-  // Lê barbeiro da URL se houver
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const bid = params.get('barber')
-      if (bid) {
-        setBarberId(bid)
-        sb.from('barbers').select('id,name,color,avatar_url').eq('id',bid).eq('active',true).single()
-          .then(({ data }) => setBarberInfo(data||null))
-      }
-    }
-  }, [])
 
   // Dados do salão
   const [salon,       setSalon]       = useState(null)
@@ -165,11 +150,17 @@ export default function AgendarPage({ params }) {
 
   /* Carrega dados do salão */
   useEffect(() => {
-    Promise.all([
-      sb.from('salons').select('*').eq('id',salonId).single(),
-      sb.from('services').select('id,name,price,duration,category').eq('salon_id',salonId).eq('active',true).order('name'),
-      sb.from('blocked_dates').select('date').eq('salon_id',salonId),
-      sb.from('schedule_config').select('*').eq('salon_id',salonId),
+    const toSlug = (name) => (name||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(salonId)
+
+    const loadById = (id) => Promise.all([
+      sb.from('salons').select('*').eq('id',id).single(),
+      sb.from('services').select('id,name,price,duration,category').eq('salon_id',id).eq('active',true).order('name'),
+      sb.from('blocked_dates').select('date').eq('salon_id',id),
+      sb.from('schedule_config').select('*').eq('salon_id',id),
     ]).then(([{data:s,error:e},{data:sv},{data:bl},{data:sc}])=>{
       if (e||!s) { setNotFound(true); setLoading(false); return }
       setSalon(s)
@@ -177,21 +168,33 @@ export default function AgendarPage({ params }) {
       setBlocked((bl||[]).map(b=>b.date))
       setSchedCfg(sc||[])
       setLoading(false)
-      sb.from('page_views').insert({salon_id:salonId,type:'booking'}).catch(()=>{})
+      sb.from('page_views').insert({salon_id:id,type:'booking'}).catch(()=>{})
     })
+
+    if (isUUID) {
+      loadById(salonId)
+    } else {
+      // Resolve slug → id: busca salões ativos, filtra pelo slug do nome
+      sb.from('salons').select('id,name').eq('is_active',true)
+        .then(({data:all})=>{
+          const match = (all||[]).find(s=>toSlug(s.name)===salonId)
+          if (match) loadById(match.id)
+          else { setNotFound(true); setLoading(false) }
+        })
+    }
   },[])
 
   /* Carrega slots ocupados ao selecionar data */
   useEffect(()=>{
-    if (!dataSel||!salonId) return
+    if (!dataSel||!salon?.id) return
     setHoraSel('')
     sb.from('appointments').select('date')
-      .eq('salon_id',salonId)
+      .eq('salon_id',salon.id)
       .gte('date',`${dataSel}T00:00:00`)
       .lte('date',`${dataSel}T23:59:59`)
       .not('status','eq','cancelado')
       .then(({data})=>setOcupados((data||[]).map(a=>a.date?.slice(11,16))))
-  },[dataSel])
+  },[dataSel,salon?.id])
 
   /* Lookup de cliente por telefone */
   const lookupCliente = async (phoneRaw) => {
@@ -199,7 +202,7 @@ export default function AgendarPage({ params }) {
     if (phone.length < 10) return
     setLookingUp(true)
     const { data:cl } = await sb.from('clients')
-      .select('*').eq('salon_id',salonId)
+      .select('*').eq('salon_id',salon?.id)
       .or(`phone.ilike.%${phone}%,phone.eq.${phone}`)
       .limit(1)
     const found = cl?.[0] || null
@@ -248,11 +251,10 @@ export default function AgendarPage({ params }) {
 
       if (!clientId) {
         const { data:cl } = await sb.from('clients').upsert({
-          salon_id: salonId,
+          salon_id: salon?.id,
           name: nome.trim(),
           phone: phoneClean,
           referral_source: origem||null,
-          last_barber_id: barberId||null,
           first_visit: dataSel,
           status: 'ativo',
           visit_count: 0, ltv: 0,
@@ -262,7 +264,7 @@ export default function AgendarPage({ params }) {
 
       // Cria agendamento
       const { data:ap } = await sb.from('appointments').insert({
-        salon_id: salonId,
+        salon_id: salon?.id,
         client_id: clientId,
         client_name: nome.trim(),
         service_name: svNomes,
@@ -271,7 +273,6 @@ export default function AgendarPage({ params }) {
         value: total,
         notes: `${phoneClean}${obs?' | '+obs:''}`,
         cut_preference: cutPref.trim()||null,
-        barber_id: barberId||null,
       }).select().single()
 
       setResultado({ ap, svNomes, total, dataSel, horaSel })
@@ -340,10 +341,6 @@ export default function AgendarPage({ params }) {
       <div style={{background:'#0B1E3D',padding:'20px 20px 14px',textAlign:'center'}}>
         {salon.logo_url&&<img src={salon.logo_url} style={{width:56,height:56,borderRadius:28,objectFit:'cover',marginBottom:8}}/>}
         <div style={{fontFamily:'Dancing Script,cursive',fontSize:24,color:'#fff',fontWeight:700}}>{salon.name||'Meu Salão'}</div>
-        {barberInfo&&<div style={{marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-          <div style={{width:28,height:28,borderRadius:14,background:barberInfo.color||'#1B3057',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800}}>{barberInfo.name?.charAt(0).toUpperCase()}</div>
-          <span style={{fontSize:12,color:'rgba(255,255,255,.7)',fontWeight:600}}>com {barberInfo.name}</span>
-        </div>}
         <div style={{fontFamily:'Dancing Script,cursive',fontSize:12,color:'rgba(255,255,255,.4)'}}>Agendamento online</div>
       </div>
 
