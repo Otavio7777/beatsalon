@@ -44,7 +44,7 @@ export default function AdminsPage() {
     if (!form.email.trim()||!form.email.includes('@')) { showMsg(false,'E-mail inválido.'); return }
     if (admins.find(a=>a.email===form.email.trim())) { showMsg(false,'E-mail já cadastrado.'); return }
     setAdding(true)
-    const { error } = await sb.from('admin_emails').insert({ email:form.email.trim(), name:form.name.trim()||null, level:form.level })
+    const { error } = await sb.rpc('insert_admin_email', { p_email: form.email.trim(), p_name: form.name.trim()||form.email.trim(), p_level: form.level })
     setAdding(false)
     if (error) { showMsg(false, error.message); return }
     setForm({ email:'', name:'', level:'gestor' })
@@ -54,12 +54,14 @@ export default function AdminsPage() {
 
   const remove = async (email) => {
     if (!confirm(`Remover acesso de ${email}?`)) return
-    await sb.from('admin_emails').delete().eq('email', email)
+    await sb.rpc('delete_admin_email', { p_email: email })
     showMsg(true, 'Acesso removido.'); load()
   }
 
   const updateLevel = async (email, level) => {
-    await sb.from('admin_emails').update({ level }).eq('email', email)
+    // Reutiliza insert_admin_email que faz UPSERT
+    const existing = admins.find(a=>a.email===email)
+    await sb.rpc('insert_admin_email', { p_email: email, p_name: existing?.name||email, p_level: level })
     load()
   }
 
