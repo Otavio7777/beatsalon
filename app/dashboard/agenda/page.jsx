@@ -573,7 +573,7 @@ export default function AgendaPage() {
   const [concludeModal, setConcludeModal] = useState(null)
   const [remarcarModal,  setRemarcarModal]  = useState(null)
   const [currDate, setCurrDate] = useState(()=>today())
-  const [view, setView]       = useState('lista')
+  const [view, setView]       = useState('hoje')
   const [showModal, setShowModal] = useState(false)
   const [editAppt, setEditAppt]  = useState(null)
   const sb = createClient()
@@ -665,17 +665,15 @@ export default function AgendaPage() {
 
       {/* Toolbar */}
       <div className="toolbar">
-        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()-7):n.setMonth(n.getMonth()-1); return n })}>‹</button>
+        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()-7):view==='hoje'||view==='amanha'?n.setDate(n.getDate()-1):n.setMonth(n.getMonth()-1); return n })}>‹</button>
         <span style={{fontWeight:700,fontSize:14,minWidth:180,textAlign:'center',color:'var(--navy-900)'}}>
-          {view==='semana' ? `${weekDays()[0].getDate()}–${weekDays()[6].getDate()} de ${MESES[weekDays()[6].getMonth()]}` : `${MESES[currDate.getMonth()]} ${currDate.getFullYear()}`}
+          {view==='semana' ? `${weekDays()[0].getDate()}–${weekDays()[6].getDate()} de ${MESES[weekDays()[6].getMonth()]}` : view==='hoje' ? `Hoje · ${currDate.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}` : view==='amanha' ? `Amanhã · ${new Date(currDate.getTime()+86400000).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})}` : `${MESES[currDate.getMonth()]} ${currDate.getFullYear()}`}
         </span>
-        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()+7):n.setMonth(n.getMonth()+1); return n })}>›</button>
+        <button className="btn-secondary" onClick={()=>setCurrDate(d=>{ const n=new Date(d); view==='semana'?n.setDate(n.getDate()+7):view==='hoje'||view==='amanha'?n.setDate(n.getDate()+1):n.setMonth(n.getMonth()+1); return n })}>›</button>
         <button className="btn-secondary" onClick={()=>setCurrDate(today())}>Hoje</button>
         <div style={{display:'flex',gap:4,marginLeft:'auto'}}>
-          {['semana','lista'].map(v=>(
-            <button key={v} className={`filter-btn${view===v?' active':''}`} onClick={()=>setView(v)}>
-              {v.charAt(0).toUpperCase()+v.slice(1)}
-            </button>
+          {[['hoje','Hoje'],['amanha','Amanhã'],['semana','Semana'],['mes','Mês'],['lista','Lista']].map(([v,l])=>(
+            <button key={v} className={`filter-btn${view===v?' active':''}`} onClick={()=>setView(v)}>{l}</button>
           ))}
         </div>
         <button className="btn-primary" onClick={()=>{setEditAppt(null);setShowModal(true)}} style={{display:'flex',alignItems:'center',gap:6}}>
@@ -716,6 +714,117 @@ export default function AgendaPage() {
       )}
 
       {/* Lista */}
+
+      {/* Hoje */}
+      {(view==='hoje'||view==='amanha') && (() => {
+        const targetDate = view==='hoje' ? new Date() : (() => { const d=new Date(); d.setDate(d.getDate()+1); return d })()
+        const dayStr = targetDate.toISOString().slice(0,10)
+        const dayAppts = appts.filter(a => a.date?.startsWith(dayStr)).sort((a,b)=>a.date>b.date?1:-1)
+        return (
+          <div>
+            <div style={{padding:'14px 16px',background:'var(--navy-50)',borderRadius:'12px 12px 0 0',borderBottom:'2px solid var(--border)'}}>
+              <div style={{fontSize:15,fontWeight:800,color:'var(--navy-900)'}}>
+                {view==='hoje'?'Hoje':'Amanhã'} · {targetDate.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}
+              </div>
+              <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{dayAppts.length} agendamento{dayAppts.length!==1?'s':''}</div>
+            </div>
+            {dayAppts.length===0
+              ? <div style={{padding:'32px 16px',textAlign:'center',color:'var(--muted)',fontSize:13}}>
+                  Nenhum agendamento para {view==='hoje'?'hoje':'amanhã'}.
+                </div>
+              : dayAppts.map((a,i) => {
+                const cfg=STATUS[a.status]||STATUS.agendado
+                const dt=new Date(a.date)
+                const isAg=a.status==='agendado'
+                return (
+                  <div key={a.id} style={{padding:'14px 16px',borderBottom:i<dayAppts.length-1?'1px solid var(--gray-100)':'none'}}>
+                    <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:isAg?10:0}}>
+                      <div style={{width:48,textAlign:'center',background:isAg?'var(--navy-600)':'var(--gray-100)',borderRadius:10,padding:'6px 4px',flexShrink:0}}>
+                        <div style={{fontSize:16,fontWeight:800,color:isAg?'#fff':'var(--text)'}}>{String(dt.getHours()).padStart(2,'0')}</div>
+                        <div style={{fontSize:10,color:isAg?'rgba(255,255,255,.7)':'var(--muted)',fontWeight:700}}>{String(dt.getMinutes()).padStart(2,'0')}</div>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:3}}>
+                          <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{a.client_name}</span>
+                          <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
+                        </div>
+                        <div style={{fontSize:12,color:'var(--muted)'}}>{a.service_name||'—'}{a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}</div>
+                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2}}>✂️ {a.cut_preference}</div>}
+                      </div>
+                      <div style={{display:'flex',gap:5}}>
+                        <WaPanel appt={a} salon={salon} onRefresh={load}/>
+                        <button className="btn-ghost" onClick={()=>{setEditAppt(a);setShowModal(true)}} style={{padding:'6px 8px'}}><Edit size={13} color="var(--muted)"/></button>
+                        <button className="btn-danger" onClick={()=>del(a.id)} style={{padding:'6px 8px'}}><Trash size={13} color="var(--danger)"/></button>
+                      </div>
+                    </div>
+                    {isAg&&(
+                      <div style={{display:'flex',gap:8,marginLeft:60,flexWrap:'wrap'}}>
+                        <button onClick={()=>setConcludeModal(a)} style={{flex:'1 1 120px',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px 14px',borderRadius:10,border:'none',background:'var(--navy-600)',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',minHeight:40}}>
+                          <Check size={13} color="#fff"/> Concluir
+                        </button>
+                        <button onClick={()=>setRemarcarModal(a)} style={{flex:'1 1 100px',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px 14px',borderRadius:10,border:'1.5px solid var(--navy-200)',background:'var(--navy-50)',color:'var(--navy-700)',fontSize:12,fontWeight:700,cursor:'pointer',minHeight:40}}>
+                          ↻ Remarcar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            }
+          </div>
+        )
+      })()}
+
+      {/* Mês */}
+      {view==='mes' && (() => {
+        const ano = currDate.getFullYear()
+        const mes = currDate.getMonth()
+        const primeiro = new Date(ano,mes,1).getDay()
+        const ultimo   = new Date(ano,mes+1,0).getDate()
+        const cells    = [...Array(primeiro).fill(null), ...Array.from({length:ultimo},(_,i)=>i+1)]
+        const str = d => `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+        const hoje = new Date(); hoje.setHours(0,0,0,0)
+        const MESES_N = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+        return (
+          <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:'2px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{MESES_N[mes]} {ano}</span>
+              <span style={{fontSize:12,color:'var(--muted)'}}>{appts.filter(a=>a.date?.startsWith(str(1).slice(0,7))).length} agendamentos no mês</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',borderBottom:'1px solid var(--gray-100)'}}>
+              {['D','S','T','Q','Q','S','S'].map((d,i)=>(
+                <div key={i} style={{padding:'8px 4px',textAlign:'center',fontSize:10,fontWeight:700,color:'var(--muted)'}}>{d}</div>
+              ))}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
+              {cells.map((d,i)=>{
+                if (!d) return <div key={`e${i}`} style={{minHeight:60,borderRight:'1px solid var(--gray-100)',borderBottom:'1px solid var(--gray-100)'}}/>
+                const dayStr = str(d)
+                const dayAppts = appts.filter(a=>a.date?.startsWith(dayStr))
+                const isTdy = new Date(ano,mes,d).toDateString()===hoje.toDateString()
+                return (
+                  <div key={d} style={{minHeight:60,padding:4,borderRight:'1px solid var(--gray-100)',borderBottom:'1px solid var(--gray-100)',background:isTdy?'var(--navy-50)':'transparent'}}>
+                    <div style={{fontSize:11,fontWeight:isTdy?800:500,color:isTdy?'var(--navy-700)':'var(--text)',marginBottom:2,width:20,height:20,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',background:isTdy?'var(--navy-600)':'transparent',color:isTdy?'#fff':'var(--text)'}}>
+                      {d}
+                    </div>
+                    {dayAppts.slice(0,3).map((a,ai)=>{
+                      const cfg=STATUS[a.status]||STATUS.agendado
+                      return (
+                        <div key={ai} style={{fontSize:9,fontWeight:600,color:cfg.color,background:cfg.bg,borderRadius:3,padding:'1px 4px',marginBottom:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                          onClick={()=>{setEditAppt(a);setShowModal(true)}}>
+                          {fmtHM(a.date)} {a.client_name?.split(' ')[0]}
+                        </div>
+                      )
+                    })}
+                    {dayAppts.length>3&&<div style={{fontSize:8,color:'var(--muted)',fontWeight:600}}>+{dayAppts.length-3}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {view==='lista' && (
         <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
           {loading
