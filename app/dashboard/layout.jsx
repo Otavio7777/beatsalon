@@ -6,6 +6,26 @@ import { useSalon } from '../../lib/useSalon'
 import { useEffect, useState } from 'react'
 import { Home, Calendar, Users, DollarSign, Scissors, Clock, Package, Settings, LogOut, X, ArrowLeft, MessageSquare } from '../../lib/icons'
 
+const MULTI_BARBER_PLANS = ['equipe','supremo','pro','enterprise']
+
+function useNavItems(salon) {
+  const base = [
+    { href:'/dashboard',               Icon:Home,          label:'Início' },
+    { href:'/dashboard/agenda',        Icon:Calendar,      label:'Agenda' },
+    { href:'/dashboard/clientes',      Icon:Users,         label:'Clientes' },
+    { href:'/dashboard/financeiro',    Icon:DollarSign,    label:'Financeiro' },
+    { href:'/dashboard/servicos',      Icon:Scissors,      label:'Serviços' },
+    { href:'/dashboard/horarios',      Icon:Clock,         label:'Horários' },
+    { href:'/dashboard/mensagens',     Icon:MessageSquare, label:'Mensagens' },
+    { href:'/dashboard/produtos',      Icon:Package,       label:'Produtos' },
+    { href:'/dashboard/configuracoes', Icon:Settings,      label:'Config' },
+  ]
+  if (salon && MULTI_BARBER_PLANS.includes(salon.plan)) {
+    base.splice(3, 0, { href:'/dashboard/equipe', Icon:Users, label:'Equipe' })
+  }
+  return base
+}
+
 const navItems = [
   { href:'/dashboard',               Icon:Home,          label:'Início' },
   { href:'/dashboard/agenda',        Icon:Calendar,      label:'Agenda' },
@@ -31,6 +51,7 @@ export default function DashboardLayout({ children }) {
   const { salon, user, loading, isAdmin, adminLevel, maintenanceMode, maintenanceName, exitMaintenance } = useSalon()
   const [open, setOpen] = useState(false)
   const [mobile, setMobile] = useState(true)
+  const dynamicNav = useNavItems(salon)
 
   useEffect(() => {
     const check = () => { const m = window.innerWidth < 769; setMobile(m); setOpen(!m) }
@@ -93,7 +114,7 @@ export default function DashboardLayout({ children }) {
 
         <nav style={{padding:'6px 0',flex:1,overflowY:'auto'}}>
           <div className="nav-section-label">Menu</div>
-          {navItems.map(({href,Icon,label})=>(
+          {dynamicNav.map(({href,Icon,label})=>(
             <Link href={href} key={href} className={`nav-item${isActive(href)?' active':''}`} onClick={()=>mobile&&setOpen(false)}>
               <Icon size={15}/>{label}
             </Link>
