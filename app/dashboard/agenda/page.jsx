@@ -430,6 +430,7 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
             ltv:         parseFloat(((cl?.ltv||0) + (appt.value||0)).toFixed(2)),
           }
           if (!cl?.first_visit) crmUpd.first_visit = apptDate
+          if (appt.barber_id) crmUpd.last_barber_id = appt.barber_id
 
           await sb.from('clients').update(crmUpd).eq('id', appt.client_id)
         }
