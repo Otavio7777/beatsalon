@@ -150,6 +150,7 @@ export default function AgendarPage({ params }) {
   const [obs,         setObs]         = useState('')
   const [salvando,    setSalvando]    = useState(false)
   const [resultado,   setResultado]   = useState(null)
+  const [erroMsg,     setErroMsg]     = useState(null)
 
   /* Carrega dados do salão */
   useEffect(() => {
@@ -254,25 +255,35 @@ export default function AgendarPage({ params }) {
     const svNomes = selecionados.map(sv=>sv.name).join(', ')
 
     try {
-      // Upsert cliente
+      setErroMsg(null)
       const phoneClean = fone.replace(/\D/g,'')
       let clientId = clienteEncontrado?.id || null
 
       if (!clientId) {
-        const { data:cl } = await sb.from('clients').upsert({
+        // Tenta upsert pelo conflito salon_id+phone
+        const { data:cl, error:clErr } = await sb.from('clients').upsert({
           salon_id: salon?.id,
           name: nome.trim(),
           phone: phoneClean,
-          referral_source: origem||null,
+          referral_source: origem || '',
           first_visit: dataSel,
           status: 'ativo',
-          visit_count: 0, ltv: 0,
-        },{ onConflict:'salon_id,phone', ignoreDuplicates:false }).select().single()
-        clientId = cl?.id
+          visit_count: 0,
+          ltv: 0,
+        }, { onConflict: 'salon_id,phone', ignoreDuplicates: false }).select('id').single()
+
+        if (cl?.id) {
+          clientId = cl.id
+        } else {
+          // Fallback: busca pelo telefone (cliente já existe mas RLS impediu upsert retornar)
+          const { data:found } = await sb.from('clients')
+            .select('id').eq('salon_id', salon?.id).eq('phone', phoneClean).maybeSingle()
+          clientId = found?.id || null
+        }
       }
 
       // Cria agendamento
-      const { data:ap } = await sb.from('appointments').insert({
+      const { data:ap, error:apErr } = await sb.from('appointments').insert({
         salon_id: salon?.id,
         client_id: clientId,
         client_name: nome.trim(),
@@ -282,12 +293,14 @@ export default function AgendarPage({ params }) {
         value: total,
         barber_id: barberId || null,
         notes: `${phoneClean}${obs?' | '+obs:''}`,
-        cut_preference: cutPref.trim()||null,
+        cut_preference: cutPref.trim() || null,
       }).select().single()
 
+      if (apErr) throw new Error(apErr.message)
       setResultado({ ap, svNomes, total, dataSel, horaSel })
     } catch(e) {
       console.error(e)
+      setErroMsg('Ocorreu um erro ao confirmar. Tente novamente.')
     }
     setSalvando(false)
   }
@@ -572,6 +585,11 @@ export default function AgendarPage({ params }) {
               <textarea style={{...INP,resize:'none',minHeight:70}} placeholder="Algum pedido especial?" value={obs} onChange={e=>setObs(e.target.value)}/>
             </div>
 
+            {erroMsg && (
+              <div style={{background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:10,padding:'10px 14px',fontSize:13,color:'#B91C1C',marginBottom:8,textAlign:'center'}}>
+                {erroMsg}
+              </div>
+            )}
             <div style={{display:'flex',gap:8,marginTop:4}}>
               <button onClick={()=>setEtapa(3)} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
               <button onClick={confirmar} disabled={salvando}
