@@ -1,4 +1,5 @@
 'use client'
+import { todayBRT, fmtHoraBRT, fmtDataBRT, isTodayBRT, dayOfWeekBRT, toISOBRT, monthYearBRT, nowBRT } from '../../../lib/timezone'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
@@ -15,10 +16,23 @@ const STATUS = {
   faltou:    {bg:'var(--warning-light)',color:'var(--warning)',label:'Faltou'},
 }
 
-function isTodayAppt(a) { if (!a?.date) return false; const dt = a.date.slice(0,10); return dt === today().toISOString().slice(0,10) }
-function today() { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()) }
-function fmtHM(iso) { return iso?.slice(11,16)||'' }
-
+function todayBR() {
+  const str = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  const [y,m,d] = str.split('-').map(Number); return new Date(y,m-1,d)
+}
+function todayStrBR() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+}
+function today() { return todayBR() }
+function isTodayAppt(a) {
+  if (!a?.date) return false
+  const apptLocal = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  return apptLocal === todayStrBR()
+}
+function fmtHM(isoStr) {
+  if (!isoStr) return ''
+  return new Date(isoStr).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit' })
+}
 /* Gera links WhatsApp */
 function waLink(phone, msg) {
   if (!phone) return null
@@ -271,99 +285,148 @@ function WaPanel({ appt, salon, onRefresh }) {
 
 
 /* ── Modal Remarcar Atendimento ── */
-function RemarcarModal({ appt, salonName, onClose, onSaved }) {
+function gerarSlotsLocal(schedCfg, date) {
+  if (!schedCfg?.length || !date) return Array.from({length:29},(_,i)=>{const m=7*60+i*30;return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`})
+  const dow = new Date(date+'T12:00:00').getDay()
+  const cfg = schedCfg.find(c=>c.day_of_week===dow)
+  if (cfg?.is_open===false) return []
+  if (!cfg?.open_time) return []
+  const dur = cfg.slot_duration||30
+  const [hI,mI] = cfg.open_time.split(':').map(Number)
+  const [hF,mF] = cfg.close_time.split(':').map(Number)
+  const ls = cfg.lunch_start?cfg.lunch_start.split(':').map(Number).reduce((a,b,i)=>i===0?a*60+b:a+b,0):null
+  const le = cfg.lunch_end  ?cfg.lunch_end.split(':').map(Number).reduce((a,b,i)=>i===0?a*60+b:a+b,0)  :null
+  const s = []
+  for (let m=hI*60+mI; m+dur<=hF*60+mF; m+=dur) {
+    if (!ls||!le||m<ls||m>=le) s.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`)
+  }
+  return s
+}
+
+function RemarcarModal({ appt, salonName, salonId, schedCfg=[], onClose, onSaved }) {
   const [novaData, setNovaData] = useState('')
   const [novaHora, setNovaHora] = useState('')
-  const [saving,   setSaving]  = useState(false)
-  const [saved,    setSaved]   = useState(false)
+  const [slots,    setSlots]    = useState([])
+  const [saving,   setSaving]   = useState(false)
+  const [saved,    setSaved]    = useState(false)
   const sb = createClient()
 
-  // Gera horários das 07:00 às 21:00 de 30 em 30 min
-  const horas = []
-  for (let m = 7*60; m <= 21*60; m += 30) {
-    horas.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`)
-  }
+  // Gera slots reais do schedule_config e exclui ocupados
+  useEffect(() => {
+    if (!novaData) { setSlots([]); setNovaHora(''); return }
+    const load = async () => {
+      // Slots disponíveis via schedule_config
+      const rawSlots = gerarSlotsLocal(schedCfg, novaData)
+      if (!rawSlots.length) { setSlots([]); return }
+      // Remove slots já ocupados
+      const { data: ocupadosData } = await sb.from('appointments')
+        .select('date').eq('salon_id', salonId)
+        .gte('date', `${novaData}T00:00:00`).lte('date', `${novaData}T23:59:59`)
+        .not('status', 'eq', 'cancelado').neq('id', appt.id)
+      const ocupados = (ocupadosData||[]).map(a => a.date?.slice(11,16))
+      setSlots(rawSlots.filter(s => !ocupados.includes(s)))
+      setNovaHora('')
+    }
+    load()
+  }, [novaData, schedCfg])
 
   const msgWa = novaData && novaHora
     ? `Olá ${appt.client_name?.split(' ')[0]}! 📅 Seu horário de *${appt.service_name||'atendimento'}* em *${salonName}* foi remarcado para *${new Date(novaData+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}* às *${novaHora}*. Aguardamos você! 🙂`
     : ''
 
-  const phone = appt.notes?.match(/\d{10,11}/)?.[0]
+  const phone  = appt.notes?.match(/\d{10,11}/)?.[0] || appt.client_phone?.replace(/\D/g,'')
   const waLink = phone && msgWa ? `https://wa.me/55${phone}?text=${encodeURIComponent(msgWa)}` : null
 
   const save = async () => {
     if (!novaData || !novaHora) return
     setSaving(true)
-    const newDate = `${novaData}T${novaHora}:00`
     await sb.from('appointments').update({
-      date: newDate,
-      status: 'agendado',
-      reschedule_requested: false,
+      date: `${novaData}T${novaHora}:00`,
+      status: 'agendado', reschedule_requested: false,
     }).eq('id', appt.id)
-    setSaving(false)
-    setSaved(true)
-    onSaved()
+    setSaving(false); setSaved(true); onSaved()
+  }
+
+  // Verifica se o dia está disponível no schedule_config
+  const isOpen = (d) => {
+    if (!d) return true
+    const dow = new Date(d+'T12:00:00').getDay()
+    const cfg = schedCfg.find(c => c.day_of_week === dow)
+    return !cfg || cfg.is_open !== false
   }
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box">
-        <div style={{fontSize:16,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Remarcar atendimento</div>
-        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>
-          {appt.client_name} · {appt.service_name}
-          {appt.date && <span> · agendado para {new Date(appt.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} às {fmtHM(appt.date)}</span>}
+        <div style={{width:40,height:4,borderRadius:2,background:'#E2E8F0',margin:'0 auto 20px'}}/>
+        <div style={{fontSize:17,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Remarcar atendimento</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20,paddingBottom:16,borderBottom:'1px solid #F1F5F9'}}>
+          <strong style={{color:'var(--navy-900)'}}>{appt.client_name}</strong> · {appt.service_name}
         </div>
 
-        <label className="inp-label">Nova data *</label>
+        <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',display:'block',marginBottom:5}}>Nova data *</label>
         <input type="date" value={novaData} onChange={e=>setNovaData(e.target.value)}
-          min={new Date().toISOString().slice(0,10)}
-          className="inp-field"/>
+          min={todayBRT()}
+          style={{width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid var(--border)',fontSize:14,color:'var(--text)',outline:'none',background:'var(--white)',boxSizing:'border-box',marginBottom:14}}/>
 
-        <label className="inp-label" style={{marginTop:14}}>Novo horário *</label>
-        <select value={novaHora} onChange={e=>setNovaHora(e.target.value)} className="inp-field" style={{cursor:'pointer'}}>
-          <option value="">Selecione o horário</option>
-          {horas.map(h=><option key={h} value={h}>{h}</option>)}
-        </select>
+        {novaData && !isOpen(novaData) && (
+          <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:14,fontSize:12,color:'#92400E',fontWeight:600}}>
+            ⚠️ Este dia está fechado nas configurações de horário.
+          </div>
+        )}
+
+        {novaData && isOpen(novaData) && (
+          <div>
+            <label style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',display:'block',marginBottom:8}}>
+              Horário disponível · {slots.length} vaga{slots.length!==1?'s':''}
+            </label>
+            {slots.length===0
+              ? <div style={{padding:'12px',textAlign:'center',color:'var(--muted)',fontSize:12,background:'var(--gray-50)',borderRadius:9}}>Sem horários disponíveis neste dia.</div>
+              : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(70px,1fr))',gap:8,maxHeight:180,overflowY:'auto',marginBottom:14}}>
+                  {slots.map(h=>(
+                    <button key={h} onClick={()=>setNovaHora(h)}
+                      style={{padding:'9px 4px',borderRadius:9,border:`2px solid ${novaHora===h?'var(--navy-600)':'var(--border)'}`,
+                        background:novaHora===h?'var(--navy-600)':'var(--white)',color:novaHora===h?'#fff':'var(--text)',
+                        fontSize:13,fontWeight:700,cursor:'pointer',minHeight:40}}>
+                      {h}
+                    </button>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
 
         {/* Preview mensagem WhatsApp */}
         {msgWa && (
-          <div style={{marginTop:16,padding:'12px 14px',background:'#ECE5DD',borderRadius:12}}>
-            <div style={{fontSize:10,fontWeight:700,color:'#4A4A4A',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Mensagem para o cliente</div>
-            <div style={{background:'#fff',borderRadius:'12px 12px 12px 4px',padding:'10px 12px',fontSize:13,color:'#1C1C1C',lineHeight:1.6,display:'inline-block',maxWidth:'90%',boxShadow:'0 1px 3px rgba(0,0,0,.1)'}}>
+          <div style={{marginBottom:14,padding:'10px 12px',background:'#ECE5DD',borderRadius:12}}>
+            <div style={{fontSize:9,fontWeight:700,color:'#4A4A4A',textTransform:'uppercase',marginBottom:5}}>Mensagem para o cliente</div>
+            <div style={{background:'#fff',borderRadius:'10px 10px 10px 3px',padding:'8px 12px',fontSize:12,color:'#1C1C1C',lineHeight:1.6,display:'inline-block',maxWidth:'90%'}}>
               {msgWa}
             </div>
           </div>
         )}
 
-        <div style={{display:'flex',gap:10,marginTop:18,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {!saved ? (
             <>
-              <button onClick={save} disabled={saving||!novaData||!novaHora}
-                className="btn-primary" style={{flex:1,justifyContent:'center'}}>
-                {saving?'Salvando...':'Remarcar'}
+              <button onClick={save} disabled={saving||!novaData||!novaHora||!isOpen(novaData)}
+                style={{flex:1,padding:'12px',borderRadius:10,border:'none',fontSize:13,fontWeight:700,cursor:'pointer',
+                  background:saving||!novaData||!novaHora||!isOpen(novaData)?'var(--gray-200)':'var(--navy-600)',
+                  color:saving||!novaData||!novaHora||!isOpen(novaData)?'var(--muted)':'#fff'}}>
+                {saving?'Salvando...':'Confirmar remarcação'}
               </button>
-              {waLink && (
-                <a href={waLink} target="_blank" rel="noreferrer"
-                  style={{display:'flex',alignItems:'center',gap:7,padding:'11px 16px',background:'#25D366',borderRadius:'var(--radius)',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none',flex:1,justifyContent:'center'}}>
-                  💬 Avisar cliente
-                </a>
-              )}
+              {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
+                style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'12px',borderRadius:10,background:'#25D366',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}>
+                💬 Avisar
+              </a>}
             </>
           ) : (
-            <div style={{flex:1,padding:'11px 14px',background:'var(--success-light)',borderRadius:'var(--radius)',border:'1px solid #6EE7B7',color:'var(--success)',fontWeight:700,fontSize:13,textAlign:'center'}}>
+            <div style={{flex:1,padding:'12px',borderRadius:10,background:'var(--success-light)',color:'var(--success)',fontSize:13,fontWeight:700,textAlign:'center',border:'1px solid #6EE7B7'}}>
               ✓ Remarcado!
-              {waLink && (
-                <a href={waLink} target="_blank" rel="noreferrer"
-                  style={{marginLeft:10,color:'#25D366',fontWeight:700}}>
-                  Enviar WhatsApp →
-                </a>
-              )}
             </div>
           )}
         </div>
-
-        <button onClick={onClose}
-          style={{width:'100%',marginTop:10,padding:'10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+        <button onClick={onClose} style={{width:'100%',marginTop:8,padding:'11px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
           Fechar
         </button>
       </div>
@@ -371,201 +434,6 @@ function RemarcarModal({ appt, salonName, onClose, onSaved }) {
   )
 }
 
-/* Modal de conclusão de atendimento */
-function ConcludeModal({ appt, salonName, onClose, onSaved }) {
-  const [mode,    setMode]    = useState('normal')
-  const [payment, setPayment] = useState('')
-  const [remarcar,setRemarcar]= useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [err,     setErr]     = useState('')
-  const [done,    setDone]    = useState(false)
-  const sb = createClient()
-
-  const PAGAMENTOS = [
-    { id:'pix',      label:'PIX',          icon:'💠' },
-    { id:'dinheiro', label:'Dinheiro',      icon:'💵' },
-    { id:'debito',   label:'Débito',        icon:'💳' },
-    { id:'credito',  label:'Crédito',       icon:'💳' },
-  ]
-
-  const phone = appt.notes?.match(/\d{10,11}/)?.[0] || appt.client_phone?.replace(/\D/g,'')
-  const waFaltou  = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Olá, ${appt.client_name?.split(' ')[0]}! Sentimos sua falta hoje. Gostaria de remarcar? 😊`)}` : null
-  const waPos = phone ? `https://wa.me/55${phone}?text=${encodeURIComponent(`Obrigado pela visita, ${appt.client_name?.split(' ')[0]}! 🙏 Foi um prazer te atender em *${salonName||'nosso salão'}*. Para reagendar é só chamar! 😊`)}` : null
-
-  const save = async () => {
-    if (mode === 'normal' && !payment) { setErr('Selecione a forma de pagamento.'); return }
-    setSaving(true); setErr('')
-
-    try {
-      if (mode === 'faltou') {
-        /* ── Marcar como faltou ── */
-        const { error } = await sb.from('appointments')
-          .update({ status: 'faltou' })
-          .eq('id', appt.id)
-        if (error) throw new Error(error.message)
-
-      } else {
-        /* ── Marcar como concluído ── */
-        // 1. Atualiza o agendamento
-        const upd = { status: 'concluido', payment_method: payment }
-        const { error: e1 } = await sb.from('appointments').update(upd).eq('id', appt.id)
-        if (e1) {
-          // payment_method pode não existir — tenta sem
-          const { error: e2 } = await sb.from('appointments').update({ status:'concluido' }).eq('id', appt.id)
-          if (e2) throw new Error(e2.message)
-        }
-
-        // 2. Atualiza CRM do cliente (diretamente, sem RPC)
-        if (appt.client_id) {
-          const { data: cl } = await sb.from('clients')
-            .select('ltv,visit_count,first_visit')
-            .eq('id', appt.client_id)
-            .maybeSingle()
-
-          const apptDate = appt.date?.slice(0,10) || new Date().toISOString().slice(0,10)
-          const crmUpd = {
-            last_visit:  apptDate,
-            status:      'ativo',
-            visit_count: (cl?.visit_count || 0) + 1,
-            ltv:         parseFloat(((cl?.ltv||0) + (appt.value||0)).toFixed(2)),
-          }
-          if (!cl?.first_visit) crmUpd.first_visit = apptDate
-          if (appt.barber_id) crmUpd.last_barber_id = appt.barber_id
-
-          await sb.from('clients').update(crmUpd).eq('id', appt.client_id)
-        }
-      }
-
-      setSaving(false)
-      setDone(true)
-      onSaved() // recarrega a lista imediatamente
-
-    } catch(e) {
-      setErr(e.message || 'Erro ao salvar. Tente novamente.')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:50,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'24px 20px 32px',width:'100%',maxWidth:520,
-        boxShadow:'0 -8px 40px rgba(0,0,0,.2)',maxHeight:'90vh',overflowY:'auto'}}>
-
-        {/* Handle */}
-        <div style={{width:40,height:4,borderRadius:2,background:'#E2E8F0',margin:'0 auto 20px'}}/>
-
-        {/* Cabeçalho */}
-        <div style={{fontSize:17,fontWeight:800,color:'#0B1E3D',marginBottom:2}}>Concluir atendimento</div>
-        <div style={{fontSize:13,color:'#64748B',marginBottom:20,paddingBottom:16,borderBottom:'1px solid #F1F5F9'}}>
-          <strong style={{color:'#0B1E3D'}}>{appt.client_name}</strong> · {appt.service_name}
-          {appt.date&&<span> · {new Date(appt.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} às {fmtHM(appt.date)}</span>}
-          {appt.value>0&&<span style={{color:'#059669',fontWeight:700,marginLeft:6}}>R${Number(appt.value).toLocaleString('pt-BR')}</span>}
-        </div>
-
-        {/* Estado: concluído ✓ */}
-        {done ? (
-          <div>
-            {mode==='normal' ? (
-              <div>
-                <div style={{textAlign:'center',padding:'8px 0 20px'}}>
-                  <div style={{fontSize:48,marginBottom:8}}>✅</div>
-                  <div style={{fontSize:17,fontWeight:800,color:'#059669',marginBottom:4}}>Atendimento concluído!</div>
-                  <div style={{fontSize:13,color:'#64748B'}}>Pagamento via <strong>{PAGAMENTOS.find(p=>p.id===payment)?.label}</strong> · CRM atualizado</div>
-                </div>
-                {waPos&&(
-                  <a href={waPos} target="_blank" rel="noreferrer"
-                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px',borderRadius:12,background:'#25D366',color:'#fff',fontSize:14,fontWeight:700,textDecoration:'none',marginBottom:10}}>
-                    💬 Enviar mensagem pós-atendimento
-                  </a>
-                )}
-                <button onClick={onClose}
-                  style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                  Fechar
-                </button>
-              </div>
-            ) : (
-              <div>
-                <div style={{textAlign:'center',padding:'8px 0 20px'}}>
-                  <div style={{fontSize:48,marginBottom:8}}>📋</div>
-                  <div style={{fontSize:17,fontWeight:800,color:'#D97706',marginBottom:4}}>Registrado como faltou</div>
-                  <div style={{fontSize:13,color:'#64748B'}}>O agendamento foi atualizado.</div>
-                </div>
-                {waFaltou&&(
-                  <a href={waFaltou} target="_blank" rel="noreferrer"
-                    style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px',borderRadius:12,background:'#25D366',color:'#fff',fontSize:14,fontWeight:700,textDecoration:'none',marginBottom:10}}>
-                    💬 Avisar cliente
-                  </a>
-                )}
-                <button onClick={onClose}
-                  style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                  Fechar
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            {/* Modo */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:18}}>
-              {[['normal','✓  Atendimento realizado'],['faltou','✗  Cliente não veio']].map(([m,l])=>(
-                <button key={m} onClick={()=>setMode(m)}
-                  style={{padding:'11px 8px',borderRadius:11,border:`2px solid ${mode===m?'#0B1E3D':'#E2E8F0'}`,
-                    background:mode===m?'#0B1E3D':'#fff',color:mode===m?'#fff':'#64748B',
-                    fontSize:12,fontWeight:700,cursor:'pointer',textAlign:'center',lineHeight:1.4}}>
-                  {l}
-                </button>
-              ))}
-            </div>
-
-            {/* Pagamento */}
-            {mode==='normal'&&(
-              <div style={{marginBottom:18}}>
-                <div style={{fontSize:11,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:10}}>
-                  Forma de pagamento *
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  {PAGAMENTOS.map(p=>(
-                    <button key={p.id} onClick={()=>{ setPayment(p.id); setErr('') }}
-                      style={{padding:'12px 10px',borderRadius:11,border:`2px solid ${payment===p.id?'#0B1E3D':'#E2E8F0'}`,
-                        background:payment===p.id?'#0B1E3D':'#fff',color:payment===p.id?'#fff':'#1E293B',
-                        fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,minHeight:46}}>
-                      <span>{p.icon}</span>{p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Faltou — remarcar */}
-            {mode==='faltou'&&(
-              <div style={{marginBottom:18,padding:'14px',background:'#FFFBEB',borderRadius:12,border:'1px solid #FCD34D'}}>
-                <div style={{fontSize:13,fontWeight:700,color:'#92400E',marginBottom:3}}>Cliente não compareceu</div>
-                <div style={{fontSize:12,color:'#78350F'}}>O agendamento ficará com status "Faltou".</div>
-              </div>
-            )}
-
-            {/* Erro */}
-            {err&&<div style={{padding:'9px 14px',background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:9,fontSize:13,color:'#DC2626',fontWeight:600,marginBottom:14}}>{err}</div>}
-
-            {/* Botão confirmar */}
-            <button onClick={save} disabled={saving||(mode==='normal'&&!payment)}
-              style={{width:'100%',padding:'14px',borderRadius:12,border:'none',fontSize:14,fontWeight:700,cursor:'pointer',
-                background:saving||(mode==='normal'&&!payment)?'#E2E8F0':'#0B1E3D',
-                color:saving||(mode==='normal'&&!payment)?'#94A3B8':'#fff',
-                marginBottom:10}}>
-              {saving?'Salvando...' : mode==='normal'?'Confirmar conclusão':'Registrar faltou'}
-            </button>
-            <button onClick={onClose}
-              style={{width:'100%',padding:'12px',borderRadius:12,border:'1px solid #E2E8F0',background:'transparent',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
-              Cancelar
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function AgendaPage() {
   const { salon, user, loading:sl } = useSalon()
@@ -573,7 +441,7 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true)
   const [concludeModal, setConcludeModal] = useState(null)
   const [remarcarModal,  setRemarcarModal]  = useState(null)
-  const [currDate, setCurrDate] = useState(()=>today())
+  const [currDate, setCurrDate] = useState(()=>todayBR())
   const [view, setView]       = useState('hoje')
   const [barbers,  setBarbers]    = useState([])
   const [barberFiltro, setBarberFiltro] = useState('todos')
@@ -617,7 +485,7 @@ export default function AgendaPage() {
   const stats = {
     hoje:    appts.filter(a=>a.date?.startsWith(todayStr)).length,
     semana:  appts.length,
-    receita: appts.filter(a=>a.status==='concluido'&&a.date?.startsWith(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'))).reduce((s,a)=>s+(a.value||0),0),
+    receita: appts.filter(a=>a.status==='concluido'&&a.date?.startsWith(monthYearBRT())).reduce((s,a)=>s+(a.value||0),0),
   }
 
   if (sl) return <div style={{padding:48,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
@@ -737,7 +605,7 @@ export default function AgendaPage() {
       )}
       {/* Hoje */}
       {(view==='hoje'||view==='amanha') && (() => {
-        const targetDate = view==='hoje' ? new Date() : (() => { const d=new Date(); d.setDate(d.getDate()+1); return d })()
+        const targetDate = view==='hoje' ? nowBRT() : (() => { const d=nowBRT(); d.setDate(d.getDate()+1); return d })()
         const dayStr = targetDate.toISOString().slice(0,10)
         const dayAppts = appts.filter(a => a.date?.startsWith(dayStr)).sort((a,b)=>a.date>b.date?1:-1)
         return (
@@ -803,7 +671,7 @@ export default function AgendaPage() {
         const ultimo   = new Date(ano,mes+1,0).getDate()
         const cells    = [...Array(primeiro).fill(null), ...Array.from({length:ultimo},(_,i)=>i+1)]
         const str = d => `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-        const hoje = new Date(); hoje.setHours(0,0,0,0)
+        const hoje = nowBRT(); hoje.setHours(0,0,0,0)
         const MESES_N = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
         return (
           <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden'}}>
@@ -914,6 +782,9 @@ export default function AgendaPage() {
         <RemarcarModal
           appt={remarcarModal}
           salonName={salon?.name}
+          salon={salon}
+          salonId={salon?.id}
+          schedCfg={schedCfg}
           onClose={()=>setRemarcarModal(null)}
           onSaved={()=>{ load(); setRemarcarModal(null) }}
         />
