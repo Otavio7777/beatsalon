@@ -192,7 +192,12 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
         {/* Serviço */}
         <label style={lS}>Serviço</label>
         {services.length>0 ? (
-          <select style={{...iS}} value={form.service_name} onChange={e=>set('service_name',e.target.value)}>
+          <select style={{...iS}} value={form.service_name} onChange={e=>{
+            const svcName = e.target.value
+            set('service_name', svcName)
+            const svcData = services.find(s=>s.name===svcName)
+            if (svcData?.price > 0) set('value', svcData.price)
+          }}>
             <option value="">Selecione ou personalize</option>
             {services.map(s=><option key={s.id} value={s.name}>{s.name}{s.price>0?` — R$${Number(s.price).toLocaleString('pt-BR')}`:''}</option>)}
             <option value="__custom">Outro...</option>
