@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSalon } from '../../../lib/useSalon'
 import { createClient } from '../../../lib/supabase'
 import { Store, Camera, Check, MessageCircle, Eye, Share2, Copy } from '../../../lib/icons'
+import { bookingURL } from '../../../lib/config'
 
 export default function ConfiguracoesPage() {
   const { salon, user, loading: sl } = useSalon()
@@ -38,12 +39,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => { if (!sl && !user) window.location.href = '/login' }, [sl, user])
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  // Gera slug a partir do nome do salão
-  const toSlug = (name) => (name||'').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  const bookingLink = salon ? `${origin}/agendar/${toSlug(salon.name)}` : ''
+  const bookingLink = salon ? bookingURL(salon.id) : ''
 
   const handleLogoFile = (e) => {
     const file = e.target.files?.[0]
