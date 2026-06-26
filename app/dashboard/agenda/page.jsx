@@ -3,7 +3,7 @@ import { todayBRT, fmtHoraBRT, fmtDataBRT, isTodayBRT, dayOfWeekBRT, toISOBRT, m
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
-import { Calendar, Plus, Check, Edit, Trash, MessageSquare, Phone } from '../../../lib/icons'
+import { Calendar, Plus, Check, Edit, Trash, MessageSquare, Phone, Bell, CheckCircle, AlertTriangle, Scissors, X, Clock, ArrowLeft, ChevronRight, User } from '../../../lib/icons'
 
 const DIAS  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -149,7 +149,7 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
       <div className="modal-box">
         {crmMsg && (
           <div style={{background:crmMsg.type==='new'?'var(--success-light)':'var(--navy-100)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:13,fontWeight:600,color:crmMsg.type==='new'?'var(--success)':'var(--navy-700)',display:'flex',gap:8}}>
-            {crmMsg.type==='new'?'✨ Novo cliente criado:':'🔗 Vinculado a:'} <strong>{crmMsg.name}</strong>
+            {crmMsg.type==='new'?'Novo cliente criado:':'Vinculado a:'} <strong>{crmMsg.name}</strong>
           </div>
         )}
         <div className="modal-title">{appt?.id?'Editar':'Novo'} agendamento</div>
@@ -158,8 +158,8 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
         <label style={lS}>Cliente * <span style={{color:'var(--navy-500)',fontWeight:400,textTransform:'none'}}>— busque ou digite</span></label>
         {form.client_id ? (
           <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 13px',borderRadius:'var(--radius)',border:'2px solid var(--navy-400)',background:'var(--navy-50)'}}>
-            <span style={{fontWeight:700,color:'var(--navy-700)',flex:1,fontSize:13}}>👤 {form.client_name}</span>
-            <span style={{cursor:'pointer',color:'var(--muted)',fontSize:16}} onClick={clearClient}>✕</span>
+            <span style={{fontWeight:700,color:'var(--navy-700)',flex:1,fontSize:13,display:'flex',alignItems:'center',gap:4}}><User size={13} color="var(--navy-700)"/> {form.client_name}</span>
+            <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',display:'flex',alignItems:'center',padding:2}} onClick={clearClient}><X size={14}/></button>
           </div>
         ) : (
           <div style={{position:'relative'}}>
@@ -184,7 +184,7 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
         {/* Celular (se não vinculado) */}
         {!form.client_id && (
           <div>
-            <label style={lS}>WhatsApp <span style={{color:'var(--navy-500)',fontWeight:400,textTransform:'none'}}>— auto-vincula ao CRM 🔗</span></label>
+            <label style={lS}>WhatsApp <span style={{color:'var(--navy-500)',fontWeight:400,textTransform:'none'}}>— auto-vincula ao CRM</span></label>
             <input style={iS} placeholder="(00) 00000-0000" value={form.client_phone||''} onChange={e=>set('client_phone',e.target.value)} inputMode="tel" />
           </div>
         )}
@@ -249,10 +249,10 @@ function WaPanel({ appt, salon, onRefresh }) {
 
   const fone = phone || appt.client_phone
   const msgs = [
-    { label:'Lembrete 24h', icon:'🔔', href: waLink(fone, waLembrete(appt, salon?.name)), cond: appt.status==='agendado' },
-    { label:'Confirmar',    icon:'✅', href: waLink(fone, waConfirmar(appt, salon?.name)), cond: appt.status==='agendado' },
-    { label:'Obrigado',     icon:'🙏', href: waLink(fone, waObrigado(appt, salon?.name)),  cond: appt.status==='concluido' },
-    { label:'Remarcar',     icon:'📅', href: waLink(fone, waRemarcar(appt, salon?.name)),  cond: appt.status==='faltou'||appt.status==='cancelado' },
+    { label:'Lembrete 24h', Icon: Bell,         href: waLink(fone, waLembrete(appt, salon?.name)), cond: appt.status==='agendado' },
+    { label:'Confirmar',    Icon: CheckCircle,  href: waLink(fone, waConfirmar(appt, salon?.name)), cond: appt.status==='agendado' },
+    { label:'Obrigado',     Icon: MessageSquare,href: waLink(fone, waObrigado(appt, salon?.name)),  cond: appt.status==='concluido' },
+    { label:'Remarcar',     Icon: Calendar,     href: waLink(fone, waRemarcar(appt, salon?.name)),  cond: appt.status==='faltou'||appt.status==='cancelado' },
   ].filter(m=>m.cond)
 
   if (msgs.length===0) return null
@@ -271,7 +271,7 @@ function WaPanel({ appt, salon, onRefresh }) {
               <a key={m.label} href={m.href} target="_blank" rel="noreferrer"
                 style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:6,textDecoration:'none',color:'var(--text)',fontSize:12,fontWeight:600}}
                 onClick={()=>setOpen(false)}>
-                <span>{m.icon}</span> {m.label}
+                {m.Icon && <m.Icon size={12} color="var(--navy-600)"/>} {m.label}
               </a>
             ))}
           </div>
@@ -371,7 +371,7 @@ function RemarcarModal({ appt, salonName, salonId, schedCfg=[], onClose, onSaved
 
         {novaData && !isOpen(novaData) && (
           <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:14,fontSize:12,color:'#92400E',fontWeight:600}}>
-            ⚠️ Este dia está fechado nas configurações de horário.
+            <span style={{display:'flex',alignItems:'center',gap:6}}><AlertTriangle size={13} color="var(--warning)"/> Este dia está fechado nas configurações de horário.</span>
           </div>
         )}
 
@@ -417,12 +417,12 @@ function RemarcarModal({ appt, salonName, salonId, schedCfg=[], onClose, onSaved
               </button>
               {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
                 style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:7,padding:'12px',borderRadius:10,background:'#25D366',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}>
-                💬 Avisar
+                <MessageSquare size={12} color="currentColor"/> Avisar
               </a>}
             </>
           ) : (
             <div style={{flex:1,padding:'12px',borderRadius:10,background:'var(--success-light)',color:'var(--success)',fontSize:13,fontWeight:700,textAlign:'center',border:'1px solid #6EE7B7'}}>
-              ✓ Remarcado!
+              <span style={{display:'flex',alignItems:'center',gap:4}}><Check size={13} color="var(--success)"/> Remarcado!</span>
             </div>
           )}
         </div>
@@ -572,7 +572,7 @@ export default function AgendaPage() {
                         onClick={e=>{e.stopPropagation();setEditAppt(a);setShowModal(true)}}
                         style={{fontSize:10,padding:'3px 6px',borderRadius:5,marginBottom:2,background:cfg.bg,color:cfg.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>
                         {fmtHM(a.date)} {a.client_name}
-                        {a.client_id&&<span title="Vinculado ao CRM" style={{marginLeft:2}}>🔗</span>}
+                        {a.client_id&&<span title="Vinculado ao CRM" style={{marginLeft:2,display:'inline-flex',alignItems:'center'}}><CheckCircle size={10} color="#059669"/></span>}
                       </div>
                     )
                   })}
@@ -637,7 +637,7 @@ export default function AgendaPage() {
                           <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
                         </div>
                         <div style={{fontSize:12,color:'var(--muted)'}}>{a.service_name||'—'}{a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}</div>
-                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2}}>✂️ {a.cut_preference}</div>}
+                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2,display:'flex',alignItems:'center',gap:3}}><Scissors size={10} color="var(--navy-500)"/> {a.cut_preference}</div>}
                       </div>
                       <div style={{display:'flex',gap:5}}>
                         <WaPanel appt={a} salon={salon} onRefresh={load}/>
@@ -741,7 +741,7 @@ export default function AgendaPage() {
                           {a.service_name||'—'}
                           {a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}
                         </div>
-                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2}}>✂️ {a.cut_preference}</div>}
+                        {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2,display:'flex',alignItems:'center',gap:3}}><Scissors size={10} color="var(--navy-500)"/> {a.cut_preference}</div>}
                       </div>
                       <div style={{display:'flex',gap:5,alignItems:'center',flexShrink:0}}>
                         <WaPanel appt={a} salon={salon} onRefresh={load} />
