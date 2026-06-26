@@ -1003,3 +1003,20 @@ input, textarea, select { min-height: 40px; font-size: 16px !important } /* prev
 .filter-btn.active { background: var(--navy-600); color: #fff; border-color: var(--navy-600) }
 
 /* (hamburger and top-header defined in the SIDEBAR section above) */
+
+/* ── Produtos page — responsive layout ── */
+/* Mobile: mostra cards, esconde tabela */
+.produtos-list-mobile   { display: block }
+.produtos-table-desktop { display: none }
+
+/* Desktop: esconde cards, mostra tabela */
+@media(min-width: 769px) {
+  .produtos-list-mobile   { display: none }
+  .produtos-table-desktop { display: block }
+}
+
+/* KPIs de produtos — 2 cols mobile, 4 cols desktop */
+.produtos-kpis { grid-template-columns: repeat(2, 1fr) }
+@media(min-width: 769px) {
+  .produtos-kpis { grid-template-columns: repeat(4, 1fr) }
+}
