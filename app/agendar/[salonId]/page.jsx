@@ -260,8 +260,8 @@ export default function AgendarPage({ params }) {
       let clientId = clienteEncontrado?.id || null
 
       if (!clientId) {
-        // Tenta upsert pelo conflito salon_id+phone
-        const { data:cl, error:clErr } = await sb.from('clients').upsert({
+        // 1. Tentar INSERT direto (cliente novo)
+        const { data:clInsert } = await sb.from('clients').insert({
           salon_id: salon?.id,
           name: nome.trim(),
           phone: phoneClean,
@@ -270,12 +270,12 @@ export default function AgendarPage({ params }) {
           status: 'ativo',
           visit_count: 0,
           ltv: 0,
-        }, { onConflict: 'salon_id,phone', ignoreDuplicates: false }).select('id').single()
+        }).select('id')
 
-        if (cl?.id) {
-          clientId = cl.id
+        if (clInsert?.[0]?.id) {
+          clientId = clInsert[0].id
         } else {
-          // Fallback: busca pelo telefone (cliente já existe mas RLS impediu upsert retornar)
+          // 2. Cliente já existe — buscar pelo telefone sem resetar dados CRM
           const { data:found } = await sb.from('clients')
             .select('id').eq('salon_id', salon?.id).eq('phone', phoneClean).maybeSingle()
           clientId = found?.id || null
@@ -283,7 +283,7 @@ export default function AgendarPage({ params }) {
       }
 
       // Cria agendamento
-      const { data:ap, error:apErr } = await sb.from('appointments').insert({
+      const { data:apArr, error:apErr } = await sb.from('appointments').insert({
         salon_id: salon?.id,
         client_id: clientId,
         client_name: nome.trim(),
@@ -294,9 +294,10 @@ export default function AgendarPage({ params }) {
         barber_id: barberId || null,
         notes: `${phoneClean}${obs?' | '+obs:''}`,
         cut_preference: cutPref.trim() || null,
-      }).select().single()
+      }).select()
 
       if (apErr) throw new Error(apErr.message)
+      const ap = Array.isArray(apArr) ? apArr[0] : apArr
       setResultado({ ap, svNomes, total, dataSel, horaSel })
     } catch(e) {
       console.error(e)
