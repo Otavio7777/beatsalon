@@ -1,4 +1,5 @@
 'use client'
+import { Check, Store, Camera, CheckCircle } from '../../lib/icons'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
@@ -90,7 +91,7 @@ export default function OnboardingPage() {
                 display:'flex', alignItems:'center', justifyContent:'center',
                 fontSize:11, fontWeight:800, transition:'all .3s',
               }}>
-                {step > s.id ? '✓' : s.id}
+                {step > s.id ? <Check size={13} color="#fff"/> : s.id}
               </div>
               {s.id < 3 && <div style={{width:32, height:2, background: step > s.id ? '#059669' : '#E2E8F0', transition:'background .3s'}}/>}
             </div>
@@ -106,7 +107,7 @@ export default function OnboardingPage() {
           {step===1 && (
             <>
               <div style={{background:'#EFF6FF', borderRadius:12, padding:'14px 16px', marginBottom:18, display:'flex', gap:12, border:'1px solid #BFDBFE'}}>
-                <span style={{fontSize:24}}>🎉</span>
+                <CheckCircle size={24} color="#059669"/>
                 <div>
                   <div style={{fontWeight:700, color:'#1E3A5F', fontSize:14}}>Conta criada com sucesso!</div>
                   <div style={{fontSize:12, color:'#2451A0', marginTop:2}}>Agora vamos personalizar seu salão para começar a usar.</div>
@@ -151,14 +152,14 @@ export default function OnboardingPage() {
                   <img src={logoPreview} alt="" style={{width:80, height:80, borderRadius:16, objectFit:'cover', border:'2px solid #E2E8F0', flexShrink:0}}/>
                 ) : (
                   <div style={{width:80, height:80, borderRadius:16, background:'#F1F5F9', border:'2px dashed #CBD5E1', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                    <div style={{fontSize:28}}>🏪</div>
+                    <div style={{display:'flex',justifyContent:'center',marginBottom:8,opacity:.35}}><Store size={28}/></div>
                     <div style={{fontSize:9, color:'#94A3B8', marginTop:4}}>Sem logo</div>
                   </div>
                 )}
                 <div style={{flex:1}}>
                   <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleLogoFile}/>
                   <button onClick={()=>fileRef.current?.click()} style={{padding:'9px 16px', background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:10, color:'#1E3A5F', fontWeight:700, fontSize:13, cursor:'pointer', display:'block', marginBottom:8}}>
-                    📷 Escolher logo
+                    <Camera size={13} color="currentColor" style={{marginRight:5}}/> Escolher logo
                   </button>
                   <div style={{fontSize:11, color:'#94A3B8', lineHeight:1.6}}>JPG, PNG ou WebP<br/>Máx 2MB · Quadrada recomendada</div>
                 </div>
@@ -194,7 +195,7 @@ export default function OnboardingPage() {
                 color:'#fff', fontSize:15, fontWeight:700, cursor: saving||(step===1&&!form.name) ? 'default' : 'pointer',
                 boxShadow: saving ? 'none' : '0 4px 14px rgba(27,48,87,.25)',
               }}>
-              {saving ? 'Salvando...' : step===3 ? '✓ Começar a usar!' : 'Próximo →'}
+              {saving ? 'Salvando...' : step===3 ? <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Check size={13} color="currentColor"/> Começar a usar!</span> : 'Próximo →'}
             </button>
           </div>
         </div>
