@@ -1,5 +1,5 @@
-import { Users, Scissors, Mail, Smartphone, Key, Check, Eye, Link as LinkIcon } from '../../../lib/icons'
 'use client'
+import { Users, Scissors, Mail, Smartphone, Key, Check, Eye, Link as LinkIcon } from '../../../lib/icons'
 import { useState, useEffect } from 'react'
 import { useSalon } from '../../../lib/useSalon'
 import { bookingURL, barberSetupURL } from '../../../lib/config'
