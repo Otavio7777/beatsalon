@@ -143,6 +143,9 @@ export default function AgendarPage({ params }) {
   const [horaSel,     setHoraSel]     = useState('')
   const [ocupados,    setOcupados]    = useState([])
 
+  // Barbeiro selecionado (via ?barber=id na URL)
+  const [barberId,    setBarberId]    = useState(null)
+
   // Etapa 4: Confirmar
   const [obs,         setObs]         = useState('')
   const [salvando,    setSalvando]    = useState(false)
@@ -155,6 +158,12 @@ export default function AgendarPage({ params }) {
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(salonId)
+
+    // Captura barbeiro da URL (?barber=id)
+    if (typeof window !== 'undefined') {
+      const urlBarber = new URLSearchParams(window.location.search).get('barber')
+      if (urlBarber) setBarberId(urlBarber)
+    }
 
     const loadById = (id) => Promise.all([
       sb.from('salons').select('*').eq('id',id).single(),
@@ -271,6 +280,7 @@ export default function AgendarPage({ params }) {
         date: dt,
         status: 'agendado',
         value: total,
+        barber_id: barberId || null,
         notes: `${phoneClean}${obs?' | '+obs:''}`,
         cut_preference: cutPref.trim()||null,
       }).select().single()
