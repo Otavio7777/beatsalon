@@ -5,6 +5,28 @@ import { createClient } from '../../../../lib/supabase'
 import { useSalon } from '../../../../lib/useSalon'
 import Link from 'next/link'
 
+
+const NIVEIS_CRM = {
+  novo:     { label:'Novo',     cor:'#64748B', bg:'#F1F5F9', bd:'#CBD5E1', icon:'🌱' },
+  bronze:   { label:'Bronze',   cor:'#92400E', bg:'#FEF3C7', bd:'#FCD34D', icon:'🥉' },
+  prata:    { label:'Prata',    cor:'#475569', bg:'#F1F5F9', bd:'#94A3B8', icon:'🥈' },
+  ouro:     { label:'Ouro',     cor:'#B45309', bg:'#FFFBEB', bd:'#F59E0B', icon:'🥇' },
+  diamante: { label:'Diamante', cor:'#6D28D9', bg:'#EDE9FE', bd:'#A78BFA', icon:'💎' },
+  em_risco: { label:'Em risco', cor:'#DC2626', bg:'#FEF2F2', bd:'#FCA5A5', icon:'⚠️' },
+}
+function calcNivel(client) {
+  if (!client) return 'novo'
+  const visits = client.visit_count || 0
+  const ltv    = parseFloat(client.ltv || 0)
+  const lastStr = client.last_visit
+  const diasSV  = lastStr ? Math.floor((Date.now()-new Date(lastStr+'T00:00').getTime())/86400000) : null
+  if (visits > 0 && diasSV !== null && diasSV > 45) return 'em_risco'
+  if (visits === 0) return 'novo'
+  if (visits >= 16 || ltv >= 1000) return 'diamante'
+  if (visits >= 9  || ltv >= 500)  return 'ouro'
+  if (visits >= 4  || ltv >= 200)  return 'prata'
+  return 'bronze'
+}
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 const STATUS_CFG = {
   ativo:    { bg:'#D1FAE5', color:'#065F46', label:'Ativo',    bd:'#6EE7B7' },
@@ -218,10 +240,11 @@ export default function ClientePerfilPage() {
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:20,fontWeight:800,color:'#fff',marginBottom:4}}>{client.name}</div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-              <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,
-                background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.bd}`}}>
-                {cfg.label}
-              </span>
+              {(() => { const nk=calcNivel(client); const n=NIVEIS_CRM[nk]; return (
+                <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,background:n.bg,color:n.cor,border:`1px solid ${n.bd}`}}>
+                  {n.icon} {n.label}
+                </span>
+              )})()}
               {barber&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:700,background:barber.color||'#1B3057',color:'#fff'}}>
                 ✂️ {barber.name?.split(' ')[0]}
               </span>}
@@ -237,6 +260,29 @@ export default function ClientePerfilPage() {
           )}
         </div>
 
+
+        {/* Nível e progressão */}
+        {(() => {
+          const nk = calcNivel(client)
+          const n  = NIVEIS_CRM[nk]
+          const ordem = ['novo','bronze','prata','ouro','diamante']
+          const idx = ordem.indexOf(nk)
+          const pct = nk==='em_risco'?100 : idx < 0 ? 0 : (idx/(ordem.length-1))*100
+          return (
+            <div style={{marginTop:14,padding:'10px 14px',background:'rgba(255,255,255,.08)',borderRadius:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{fontSize:11,color:'rgba(255,255,255,.5)',fontWeight:600}}>Nível {n.label}</span>
+                <span style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>{client.visit_count||0} visitas · R${parseFloat(client.ltv||0).toLocaleString('pt-BR')} LTV</span>
+              </div>
+              <div style={{height:4,background:'rgba(255,255,255,.15)',borderRadius:2}}>
+                <div style={{height:'100%',background:nk==='em_risco'?'#EF4444':nk==='diamante'?'#A78BFA':nk==='ouro'?'#F59E0B':'rgba(255,255,255,.6)',borderRadius:2,width:`${pct}%`,transition:'width .3s'}}/>
+              </div>
+              {nk!=='diamante'&&nk!=='em_risco'&&<div style={{fontSize:9,color:'rgba(255,255,255,.3)',marginTop:4}}>
+                {nk==='novo'?'Faça 1 visita para Bronze':nk==='bronze'?'Mais 1 visita para Prata (4 total)':nk==='prata'?'Mais 1 visita para Ouro (9 total)':'Mais 1 visita para Diamante (16 total)'}
+              </div>}
+            </div>
+          )
+        })()}
         {/* KPIs rápidos */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:16}}>
           {[
