@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
+import { Search, X } from '../../../lib/icons'
 
 const CATEGORIAS = [
   {id:'cabelo',   label:'Cabelo'},
@@ -150,7 +151,7 @@ export default function ServicosPage() {
 
       <div className="toolbar">
         <div className="search-wrap" style={{flex:1}}>
-          <span style={{fontSize:14,color:'#8A87A0'}}>🔍</span>
+          <Search size={14} color="#8A87A0"/>
           <input className="search-inp" placeholder="Buscar serviço..." value={search} onChange={e=>setSearch(e.target.value)} />
         </div>
         <button className="btn-primary" onClick={()=>{setEditSvc(null);setShowModal(true)}}>＋ Serviço</button>
@@ -186,7 +187,7 @@ export default function ServicosPage() {
                 </div>
                 <div style={{fontSize:12,color:'#8A87A0',marginTop:3,display:'flex',gap:12,flexWrap:'wrap'}}>
                   {svc.price>0 && <span style={{fontWeight:700,color:'#1D9E75'}}>R${Number(svc.price).toLocaleString('pt-BR')}</span>}
-                  {svc.duration && <span>⏱ {svc.duration} min</span>}
+                  {svc.duration && <span>{svc.duration} min</span>}
                   {svc.description && <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:200}}>{svc.description}</span>}
                 </div>
               </div>
@@ -195,7 +196,7 @@ export default function ServicosPage() {
                   <div style={{width:16,height:16,borderRadius:8,background:'#fff',position:'absolute',top:2,left:svc.active?18:2,transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/>
                 </div>
                 <button className="btn-ghost" onClick={()=>{setEditSvc(svc);setShowModal(true)}}>Editar</button>
-                <button className="btn-danger" onClick={()=>del(svc.id)}>✕</button>
+                <button className="btn-danger" style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'5px 8px'}} onClick={()=>del(svc.id)}><X size={12} color="currentColor"/></button>
               </div>
             </div>
           ))}
