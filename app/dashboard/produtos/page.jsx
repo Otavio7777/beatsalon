@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
+import { AlertTriangle, Search, X, Package, Scissors } from '../../../lib/icons'
 
 const CATEGORIAS = ['capilar','barba','coloracao','skincare','outro']
 const CAT_ICONS = { capilar:'💇', barba:'🪒', coloracao:'🎨', skincare:'🧴', outro:'📦' }
@@ -172,7 +173,7 @@ export default function ProdutosPage() {
 
       {baixoEstoque.length > 0 && (
         <div style={{display:'flex',gap:10,background:'#FAEEDA',border:'1px solid #F5D9A0',borderRadius:12,padding:'12px 16px',marginBottom:20}}>
-          <span style={{fontSize:18}}>⚠️</span>
+          <AlertTriangle size={18} color="#D97706"/>
           <span style={{fontSize:13,color:'#633806',fontWeight:600}}>
             {baixoEstoque.length} produto{baixoEstoque.length>1?'s':''} com estoque baixo: {baixoEstoque.map(p=>p.name).join(', ')}
           </span>
@@ -181,7 +182,7 @@ export default function ProdutosPage() {
 
       <div className="toolbar">
         <div style={st.search}>
-          <span style={{fontSize:16,color:'#8A87A0'}}>🔍</span>
+          <Search size={16} color="#8A87A0"/>
           <input style={st.searchIn} placeholder="Buscar por nome ou SKU..." value={search} onChange={e=>setSearch(e.target.value)} />
         </div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
@@ -235,7 +236,7 @@ export default function ProdutosPage() {
                   <td style={st.td}>
                     <div style={{display:'flex',gap:6}}>
                       <button style={st.actBtn} onClick={() => { setEditProd(p); setShowModal(true) }}>Editar</button>
-                      <button style={{...st.actBtn,color:'#D85A30',borderColor:'#F5C4B3'}} onClick={() => del(p.id)}>✕</button>
+                      <button style={{...st.actBtn,color:'#D85A30',borderColor:'#F5C4B3',display:'flex',alignItems:'center',justifyContent:'center',width:28,padding:'4px'}} onClick={() => del(p.id)}><X size={12} color="#D85A30"/></button>
                     </div>
                   </td>
                 </tr>
