@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useSalon } from '../../../lib/useSalon'
+import { bookingURL, barberSetupURL } from '../../../lib/config'
 import { createClient } from '../../../lib/supabase'
 
 const PLAN_LIMITS = {
@@ -116,8 +117,8 @@ export default function EquipePage() {
 
   const cancelForm = () => { setAdding(false); setEditing(null); setForm({ name:'', email:'', phone:'', role:'barber', commission_type:'percentage', commission_value:40, color:'#1B3057' }) }
 
-  const setupLink  = (b) => `${typeof window!=='undefined'?window.location.origin:''}/barber/setup?salon=${salon?.id}&email=${encodeURIComponent(b.email||'')}&name=${encodeURIComponent(b.name)}`
-  const bookingLink = (b) => `${typeof window!=='undefined'?window.location.origin:''}/agendar/${salon?.id}?barber=${b.id}`
+  const setupLink  = (b) => barberSetupURL(salon?.id, b.email||'', b.name)
+  const bookingLink = (b) => bookingURL(salon?.id, b.id)
 
   if (!salon) return <div className="pg" style={{color:'var(--muted)',textAlign:'center',padding:40}}>Carregando...</div>
 
@@ -343,6 +344,12 @@ export default function EquipePage() {
                   </div>
                   {/* Ações */}
                   <div style={{display:'flex',gap:6,flexShrink:0,flexWrap:'wrap'}}>
+                    {b.active&&b.user_id&&<button onClick={()=>{
+                      sessionStorage.setItem('ms_barber_view',JSON.stringify({barberId:b.id,barberName:b.name,salonId:salon?.id,timestamp:Date.now()}))
+                      window.location.href='/dashboard'
+                    }} style={{padding:'5px 10px',borderRadius:8,border:'1px solid #C4B5FD',background:'#F5F3FF',color:'#5B21B6',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      👁 Ver como
+                    </button>}
                     <button onClick={()=>startEdit(b)}
                       style={{padding:'6px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--white)',color:'var(--muted)',fontSize:11,fontWeight:700,cursor:'pointer'}}>
                       Editar
