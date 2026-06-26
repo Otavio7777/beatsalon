@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '../../lib/supabase'
 import { useSalon } from '../../lib/useSalon'
-import { Calendar, Users, DollarSign, Scissors, MessageSquare, AlertCircle, ChevronRight } from '../../lib/icons'
+import { Calendar, Users, DollarSign, Scissors, MessageSquare, AlertCircle, ChevronRight, Bell, Gift, Briefcase, MapPin } from '../../lib/icons'
 
 const STATUS_CFG = {
   agendado:  { bg:'var(--navy-100)', color:'var(--navy-700)', label:'Agendado' },
@@ -12,7 +12,7 @@ const STATUS_CFG = {
   faltou:    { bg:'var(--warning-light)', color:'var(--warning)', label:'Faltou' },
 }
 const MESES_S = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-const MICRODATA_ICONS = { aniversario:'🎂', retorno:'🔔', evento:'📅', reuniao:'💼', outro:'📌' }
+const MICRODATA_ICONS = { aniversario: Gift, retorno: Bell, evento: Calendar, reuniao: Briefcase, outro: MapPin }
 const MICRODATA_COLORS = { aniversario:'#BE185D', retorno:'#D97706', evento:'#7C3AED', reuniao:'#0891B2', outro:'#475569' }
 
 function today() { const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()) }
@@ -147,7 +147,7 @@ export default function DashboardHome() {
     <div style={{padding:0}}>
       {/* Hero */}
       <div style={{background:'linear-gradient(135deg,var(--navy-900) 0%,var(--navy-700) 100%)',padding:'22px 20px 26px',color:'#fff'}}>
-        <div style={{fontSize:21,fontWeight:800,marginBottom:4}}>{saudacao} 👋</div>
+        <div style={{fontSize:21,fontWeight:800,marginBottom:4}}>{saudacao}</div>
         <div style={{fontSize:13,opacity:.5,marginBottom:18}}>
           {salon?.name} · {new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}
         </div>
@@ -170,7 +170,7 @@ export default function DashboardHome() {
       {/* Notificação de auto-complete financeiro */}
       {autoCompleted > 0 && (
         <div style={{background:'#D1FAE5',borderLeft:'4px solid #059669',padding:'10px 16px',display:'flex',gap:10,alignItems:'center'}}>
-          <span style={{fontSize:18}}>💰</span>
+          <DollarSign size={18} color="#059669"/>
           <div style={{flex:1}}>
             <div style={{fontSize:13,fontWeight:700,color:'#065F46'}}>
               {autoCompleted} atendimento{autoCompleted>1?'s':''} concluído{autoCompleted>1?'s':''} automaticamente
@@ -210,15 +210,15 @@ export default function DashboardHome() {
             <div className="card" style={{padding:0,overflow:'hidden'}}>
               {microProximas.map((m,i)=>{
                 const cor = MICRODATA_COLORS[m.type||'outro']
-                const ico = MICRODATA_ICONS[m.type||'outro']
+                const Ico = MICRODATA_ICONS[m.type||'outro']
                 const nome = m.clients?.name || m.client_name || '—'
                 const fone = m.clients?.phone || ''
                 const waMsg = `Olá ${nome.split(' ')[0]}! ${m.type==='aniversario'?'🎂 Feliz aniversário!':'📅 Lembrando da data: '+m.description}`
                 const waLink = fone ? `https://wa.me/55${fone.replace(/\D/g,'')}?text=${encodeURIComponent(waMsg)}` : null
                 return (
                   <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',borderBottom:i<microProximas.length-1?'1px solid var(--gray-100)':'none'}}>
-                    <div style={{width:40,height:40,borderRadius:12,background:`${cor}18`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0,border:`1px solid ${cor}30`}}>
-                      {ico}
+                    <div style={{width:40,height:40,borderRadius:12,background:`${cor}18`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,border:`1px solid ${cor}30`}}>
+                      <Ico size={18} color={cor}/>
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nome}</div>
