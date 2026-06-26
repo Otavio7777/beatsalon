@@ -4,15 +4,19 @@ import { createClient } from '../../../lib/supabase'
 import { useSalon } from '../../../lib/useSalon'
 import Link from 'next/link'
 import { todayBRT } from '../../../lib/timezone'
+import {
+  AlertTriangle, Award, Gem, Leaf, Scissors,
+  Smartphone, MessageCircle, Edit, Search, X, Users, ChevronRight
+} from '../../../lib/icons'
 
 /* ── Sistema de Níveis CRM ── */
 const NIVEIS = {
-  novo:     { label:'Novo',     icon:'🌱', cor:'#475569', bg:'#F8FAFC', bd:'#CBD5E1' },
-  bronze:   { label:'Bronze',   icon:'🥉', cor:'#92400E', bg:'#FEF7ED', bd:'#FCD34D' },
-  prata:    { label:'Prata',    icon:'🥈', cor:'#334155', bg:'#F1F5F9', bd:'#94A3B8' },
-  ouro:     { label:'Ouro',     icon:'🥇', cor:'#92400E', bg:'#FFFBEB', bd:'#F59E0B' },
-  diamante: { label:'Diamante', icon:'💎', cor:'#5B21B6', bg:'#F5F3FF', bd:'#A78BFA' },
-  em_risco: { label:'Em risco', icon:'⚠️', cor:'#B91C1C', bg:'#FEF2F2', bd:'#FCA5A5' },
+  novo:     { label:'Novo',     Icon: Leaf,          cor:'#475569', bg:'#F8FAFC', bd:'#CBD5E1' },
+  bronze:   { label:'Bronze',   Icon: Award,         cor:'#92400E', bg:'#FEF7ED', bd:'#FCD34D' },
+  prata:    { label:'Prata',    Icon: Award,         cor:'#334155', bg:'#F1F5F9', bd:'#94A3B8' },
+  ouro:     { label:'Ouro',     Icon: Award,         cor:'#92400E', bg:'#FFFBEB', bd:'#F59E0B' },
+  diamante: { label:'Diamante', Icon: Gem,           cor:'#5B21B6', bg:'#F5F3FF', bd:'#A78BFA' },
+  em_risco: { label:'Em risco', Icon: AlertTriangle, cor:'#B91C1C', bg:'#FEF2F2', bd:'#FCA5A5' },
 }
 
 function calcNivel(c) {
@@ -131,11 +135,9 @@ export default function ClientesPage() {
     return mBusca && mNivel
   })
 
-  // Contagens por nível
   const cnts = { todos:clientes.length }
   clientes.forEach(c => { const k=calcNivel(c); cnts[k]=(cnts[k]||0)+1 })
 
-  // Totais gerais
   const totalLTV    = clientes.reduce((s,c)=>s+(parseFloat(c.ltv)||0),0)
   const totalVis    = clientes.reduce((s,c)=>s+(c.visit_count||0),0)
   const emRiscoN    = cnts.em_risco||0
@@ -152,7 +154,7 @@ export default function ClientesPage() {
         <button onClick={()=>setModal('new')} className="btn-primary">+ Novo cliente</button>
       </div>
 
-      {/* KPIs principais */}
+      {/* KPIs */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10,marginBottom:16}}>
         {[
           {l:'Total de clientes', v:clientes.length, c:'#0B1E3D'},
@@ -167,17 +169,17 @@ export default function ClientesPage() {
         ))}
       </div>
 
-      {/* Níveis — chips horizontais clicáveis */}
+      {/* Filtros de nível */}
       <div style={{overflowX:'auto',paddingBottom:6,marginBottom:14}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content'}}>
           <button onClick={()=>setFiltroN('todos')}
             style={{padding:'7px 14px',borderRadius:20,border:`1.5px solid ${filtroN==='todos'?'#0B1E3D':'#E2E8F0'}`,background:filtroN==='todos'?'#0B1E3D':'#fff',color:filtroN==='todos'?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>
             Todos ({clientes.length})
           </button>
-          {Object.entries(NIVEIS).map(([k,{label,icon,cor,bg,bd}])=>(
+          {Object.entries(NIVEIS).map(([k,{label,Icon,cor,bg,bd}])=>(
             <button key={k} onClick={()=>setFiltroN(filtroN===k?'todos':k)}
               style={{padding:'7px 14px',borderRadius:20,border:`1.5px solid ${filtroN===k?cor:bd}`,background:filtroN===k?bg:'#fff',color:filtroN===k?cor:'#64748B',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:4}}>
-              {icon} {label} {cnts[k]?`(${cnts[k]})`:'(0)'}
+              <Icon size={11} color={filtroN===k?cor:'#94A3B8'}/> {label} {cnts[k]?`(${cnts[k]})`:'(0)'}
             </button>
           ))}
         </div>
@@ -185,18 +187,18 @@ export default function ClientesPage() {
 
       {/* Busca */}
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'0 12px',borderRadius:10,border:'1.5px solid #E2E8F0',background:'#fff',minHeight:42,marginBottom:14}}>
-        <svg width="14" height="14" fill="none" stroke="#94A3B8" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <Search size={14} color="#94A3B8"/>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou telefone..."
           style={{flex:1,border:'none',outline:'none',fontSize:13,color:'#0B1E3D',background:'transparent'}}/>
-        {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',cursor:'pointer',color:'#94A3B8',fontSize:16}}>×</button>}
+        {search&&<button onClick={()=>setSearch('')} style={{background:'none',border:'none',cursor:'pointer',color:'#94A3B8',display:'flex',alignItems:'center',padding:4}}><X size={14}/></button>}
       </div>
 
-      {/* Lista de clientes */}
+      {/* Lista */}
       {loading ? (
         <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:40,textAlign:'center',color:'#94A3B8',fontSize:13}}>Carregando clientes...</div>
       ) : filtered.length === 0 ? (
         <div style={{background:'#fff',borderRadius:14,border:'1px solid #E2E8F0',padding:40,textAlign:'center'}}>
-          <div style={{fontSize:32,marginBottom:10}}>👥</div>
+          <div style={{display:'flex',justifyContent:'center',marginBottom:10,opacity:.3}}><Users size={36}/></div>
           <div style={{fontSize:14,fontWeight:700,color:'#0B1E3D',marginBottom:6}}>{search||filtroN!=='todos'?'Nenhum cliente encontrado':'Sem clientes cadastrados'}</div>
           <div style={{fontSize:12,color:'#64748B',marginBottom:14}}>{search?'Tente buscar por outro nome.':filtroN!=='todos'?`Nenhum cliente no nível ${NIVEIS[filtroN]?.label}.`:'Adicione o primeiro cliente.'}</div>
           {!search&&filtroN==='todos'&&<button onClick={()=>setModal('new')} className="btn-primary">+ Novo cliente</button>}
@@ -213,38 +215,43 @@ export default function ClientesPage() {
             const ltv    = parseFloat(c.ltv)||0
             return (
               <div key={c.id} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:i<filtered.length-1?'1px solid #F1F5F9':'none'}}>
-                {/* Avatar */}
                 <Avatar name={c.name} color={c.avatar_color||'#1B3057'} size={40}/>
-                {/* Info */}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
                     <span style={{fontWeight:800,fontSize:14,color:'#0B1E3D'}}>{c.name}</span>
-                    <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:700,background:nivel.bg,color:nivel.cor,border:`1px solid ${nivel.bd}`}}>
-                      {nivel.icon} {nivel.label}
+                    <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:700,background:nivel.bg,color:nivel.cor,border:`1px solid ${nivel.bd}`,display:'inline-flex',alignItems:'center',gap:3}}>
+                      <nivel.Icon size={9} color={nivel.cor}/> {nivel.label}
                     </span>
-                    {barber&&<span style={{fontSize:9,padding:'2px 7px',borderRadius:20,fontWeight:700,background:barber.color||'#1B3057',color:'#fff'}}>✂️ {barber.name?.split(' ')[0]}</span>}
+                    {barber&&<span style={{fontSize:9,padding:'2px 7px',borderRadius:20,fontWeight:700,background:barber.color||'#1B3057',color:'#fff',display:'inline-flex',alignItems:'center',gap:3}}>
+                      <Scissors size={8} color="#fff"/> {barber.name?.split(' ')[0]}
+                    </span>}
                   </div>
                   <div style={{fontSize:11,color:'#64748B',display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
-                    {c.phone&&<span>📱 {c.phone}</span>}
+                    {c.phone&&<span style={{display:'inline-flex',alignItems:'center',gap:3}}><Smartphone size={10} color="#94A3B8"/> {c.phone}</span>}
                     <span style={{fontWeight:700,color:'#2451A0'}}>{visits} visita{visits!==1?'s':''}</span>
                     {ltv>0&&<span style={{color:'#059669',fontWeight:700}}>R${ltv.toLocaleString('pt-BR',{maximumFractionDigits:0})}</span>}
                     {dSV!==null&&<span style={{color:dSV>45?'#DC2626':dSV>30?'#D97706':'#94A3B8'}}>{dSV}d</span>}
                   </div>
                   {(c.preferred_cut||c.allergies)&&(
-                    <div style={{fontSize:10,color:'#94A3B8',marginTop:2}}>
-                      {c.preferred_cut&&<span style={{marginRight:8}}>✂️ {c.preferred_cut.slice(0,30)}</span>}
-                      {c.allergies&&<span style={{color:'#D97706'}}>⚠️ {c.allergies.slice(0,20)}</span>}
+                    <div style={{fontSize:10,color:'#94A3B8',marginTop:2,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                      {c.preferred_cut&&<span style={{display:'inline-flex',alignItems:'center',gap:3}}><Scissors size={9} color="#94A3B8"/> {c.preferred_cut.slice(0,30)}</span>}
+                      {c.allergies&&<span style={{color:'#D97706',display:'inline-flex',alignItems:'center',gap:3}}><AlertTriangle size={9} color="#D97706"/> {c.allergies.slice(0,20)}</span>}
                     </div>
                   )}
                 </div>
-                {/* Ações */}
                 <div style={{display:'flex',gap:5,flexShrink:0}}>
                   {phone&&<a href={`https://wa.me/55${phone}`} target="_blank" rel="noreferrer"
-                    style={{width:32,height:32,borderRadius:16,background:'#ECFDF5',border:'1px solid #6EE7B7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,textDecoration:'none'}}>💬</a>}
+                    style={{width:34,height:34,borderRadius:17,background:'#ECFDF5',border:'1px solid #6EE7B7',display:'flex',alignItems:'center',justifyContent:'center',textDecoration:'none'}}>
+                    <MessageCircle size={14} color="#059669"/>
+                  </a>}
                   <Link href={`/dashboard/clientes/${c.id}`}
-                    style={{width:32,height:32,borderRadius:16,background:'#EFF6FF',border:'1px solid #93C5FD',display:'flex',alignItems:'center',justifyContent:'center',textDecoration:'none',fontSize:13,color:'#2451A0',fontWeight:700}}>→</Link>
+                    style={{width:34,height:34,borderRadius:17,background:'#EFF6FF',border:'1px solid #93C5FD',display:'flex',alignItems:'center',justifyContent:'center',textDecoration:'none'}}>
+                    <ChevronRight size={14} color="#2451A0"/>
+                  </Link>
                   <button onClick={()=>setModal(c)}
-                    style={{width:32,height:32,borderRadius:16,background:'#F8FAFC',border:'1px solid #E2E8F0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12}}>✏️</button>
+                    style={{width:34,height:34,borderRadius:17,background:'#F8FAFC',border:'1px solid #E2E8F0',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Edit size={13} color="#64748B"/>
+                  </button>
                 </div>
               </div>
             )
