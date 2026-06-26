@@ -2,14 +2,14 @@
 import { useState, useEffect } from 'react'
 import { useSalon } from '../../../lib/useSalon'
 import { createClient } from '../../../lib/supabase'
-import { MessageSquare, Check } from '../../../lib/icons'
+import { Gift, Calendar, Bell, Send, MessageSquare, AlertTriangle, Check } from '../../../lib/icons'
 
 const TIPOS = [
   {
     id:'aniversario',
     label:'Aniversário',
     desc:'Enviada automaticamente no dia do aniversário do cliente',
-    icon:'🎂',
+    Icon: Gift,
     default:'Feliz aniversário, {nome}! 🎂 Que o seu dia seja incrível! Como presente especial, temos um mimo para você na sua próxima visita ao {salao}. Agende pelo link: {link}',
     vars:['{nome}','{salao}','{link}'],
   },
@@ -17,7 +17,7 @@ const TIPOS = [
     id:'agendamento',
     label:'Confirmação de agendamento',
     desc:'Enviada logo após o cliente realizar um agendamento online',
-    icon:'📅',
+    Icon: Calendar,
     default:'Olá {nome}! ✅ Seu agendamento em *{salao}* está confirmado!\n\n📌 Serviço: {servico}\n📅 Data: {data}\n⏰ Horário: {hora}\n\nQualquer dúvida, fale conosco. Até lá! 😊',
     vars:['{nome}','{salao}','{servico}','{data}','{hora}'],
   },
@@ -30,7 +30,7 @@ const TIPOS = [
     vars:['{nome}','{salao}','{servico}','{hora}'],
   },
 
-  { id:'segmento', label:'Enviar por segmento', desc:'Selecione clientes e envie mensagens personalizadas com dados reais', icon:'📤',
+  { id:'segmento', label:'Enviar por segmento', desc:'Selecione clientes e envie mensagens personalizadas com dados reais', Icon: Send,
     default:'Olá {nome}! Temos novidades especiais para você em {salao}. Que tal agendar? {link}',
     vars:['{nome}','{salao}','{link}'],
   },
@@ -50,7 +50,7 @@ function PhonePreview({ text }) {
     <div style={{ background:'#ECE5DD', borderRadius:12, padding:'12px', minHeight:80 }}>
       <div style={{ background:'#fff', borderRadius:'12px 12px 12px 4px', padding:'10px 14px', display:'inline-block', maxWidth:'85%', boxShadow:'0 1px 3px rgba(0,0,0,.1)' }}>
         <div style={{ fontSize:13, color:'#1C1C1C', lineHeight:1.6 }} dangerouslySetInnerHTML={{ __html: formatado||'Digite a mensagem...' }}/>
-        <div style={{ fontSize:10, color:'#94A3B8', textAlign:'right', marginTop:4 }}>14:30 ✓✓</div>
+        <div style={{ fontSize:10, color:'#94A3B8', textAlign:'right', marginTop:4, display:'flex', justifyContent:'flex-end', alignItems:'center', gap:1 }}>14:30 <Check size={9} color="#94A3B8"/><Check size={9} color="#94A3B8"/></div>
       </div>
     </div>
   )
@@ -163,7 +163,7 @@ export default function MensagensPage() {
       <div className="tabs" style={{marginBottom:20}}>
         {TIPOS.map(t=>(
           <button key={t.id} className={`tab-btn${tab===t.id?' active':''}`} onClick={()=>setTab(t.id)}>
-            <span style={{marginRight:4}}>{t.icon}</span>{t.label}
+            <span style={{marginRight:4}}>{t.Icon && <t.Icon size={16} color="currentColor"/>}</span>{t.label}
           </button>
         ))}
       </div>
@@ -173,7 +173,7 @@ export default function MensagensPage() {
         <div style={{flex:'1 1 300px', minWidth:0}}>
           {isBarber && (
             <div style={{padding:'10px 14px',background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:10,marginBottom:14,fontSize:12,color:'#92400E',fontWeight:600}}>
-              ⚠️ Visualização apenas. Barbeiros não podem editar os templates de mensagem.
+              <span style={{display:'flex',alignItems:'center',gap:6}}><AlertTriangle size={13} color="var(--warning)"/> Visualização apenas. Barbeiros não podem editar os templates de mensagem.</span>
             </div>
           )}
           <div className="card">
@@ -213,7 +213,7 @@ export default function MensagensPage() {
                             <div key={cl.id} onClick={()=>hasPhone&&setSelectedCli(p=>sel?p.filter(x=>x!==cl.id):[...p,cl.id])}
                               style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderBottom:'1px solid var(--gray-100)',cursor:hasPhone?'pointer':'not-allowed',background:sel?'var(--navy-50)':hasPhone?'transparent':'#FAFAFA',opacity:hasPhone?1:.5}}>
                               <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${sel?'var(--navy-600)':'var(--border)'}`,background:sel?'var(--navy-600)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                                {sel&&<span style={{color:'#fff',fontSize:10,fontWeight:800}}>✓</span>}
+                                {sel&&<Check size={10} color="#fff"/>}
                               </div>
                               <div style={{flex:1}}>
                                 <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{cl.name}</div>
@@ -232,7 +232,7 @@ export default function MensagensPage() {
                     <div style={{fontSize:12,color:'var(--navy-700)',fontWeight:600}}>{selectedCli.length} cliente{selectedCli.length!==1?'s':''} selecionado{selectedCli.length!==1?'s':''}</div>
                     <a href={`https://wa.me/?text=${encodeURIComponent(previewText(texts[tab]||tipo?.default||''))}`} target="_blank" rel="noreferrer"
                       style={{display:'inline-flex',alignItems:'center',gap:7,padding:'8px 14px',background:'#25D366',borderRadius:9,color:'#fff',fontSize:12,fontWeight:700,textDecoration:'none'}}>
-                      💬 Abrir WhatsApp
+                      <MessageSquare size={13} color="currentColor"/> Abrir WhatsApp
                     </a>
                   </div>
                 )}
