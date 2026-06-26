@@ -1,3 +1,4 @@
+import { Users, Scissors, Mail, Smartphone, Key, Check, Eye, Link as LinkIcon } from '../../../lib/icons'
 'use client'
 import { useState, useEffect } from 'react'
 import { useSalon } from '../../../lib/useSalon'
@@ -128,7 +129,7 @@ export default function EquipePage() {
       <div className="pg">
         <div className="pg-hd"><div className="pg-h1">Minha Equipe</div></div>
         <div className="card" style={{textAlign:'center',padding:'40px 24px'}}>
-          <div style={{fontSize:40,marginBottom:12}}>👥</div>
+          <div style={{display:'flex',justifyContent:'center',marginBottom:12,opacity:.25}}><Users size={40}/></div>
           <div style={{fontSize:18,fontWeight:800,color:'var(--navy-900)',marginBottom:8}}>Disponível nos planos Equipe e Supremo</div>
           <div style={{fontSize:13,color:'var(--muted)',marginBottom:20,maxWidth:360,margin:'0 auto 20px'}}>
             Seu plano atual (<strong>{planName}</strong>) permite apenas 1 barbeiro. Faça upgrade para adicionar sua equipe, gerenciar comissões e ter logins individuais.
@@ -267,7 +268,7 @@ export default function EquipePage() {
         <div className="card" style={{textAlign:'center',color:'var(--muted)',padding:32}}>Carregando...</div>
       ) : barbers.length===0 ? (
         <div className="card" style={{textAlign:'center',padding:40}}>
-          <div style={{fontSize:36,marginBottom:10}}>✂️</div>
+          <div style={{display:'flex',justifyContent:'center',marginBottom:10,opacity:.25}}><Scissors size={36}/></div>
           <div style={{fontSize:15,fontWeight:700,color:'var(--navy-900)',marginBottom:6}}>Nenhum barbeiro ainda</div>
           <div style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>Adicione os barbeiros da sua equipe para que cada um tenha seu próprio login e agenda.</div>
           <button onClick={()=>setAdding(true)} className="btn-primary">+ Adicionar primeiro barbeiro</button>
@@ -301,8 +302,8 @@ export default function EquipePage() {
                       </span>
                     </div>
                     <div style={{fontSize:12,color:'var(--muted)',marginBottom:4}}>
-                      {b.email&&<span style={{marginRight:10}}>✉ {b.email}</span>}
-                      {b.phone&&<span style={{marginRight:10}}>📱 {b.phone}</span>}
+                      {b.email&&<span style={{marginRight:10,display:'inline-flex',alignItems:'center',gap:4}}><Mail size={10} color="#64748B"/> {b.email}</span>}
+                      {b.phone&&<span style={{marginRight:10,display:'inline-flex',alignItems:'center',gap:4}}><Smartphone size={10} color="#64748B"/> {b.phone}</span>}
                       <span style={{color:'var(--navy-500)',fontWeight:600}}>Comissão: {commLabel}</span>
                     </div>
                     {/* Links do barbeiro */}
@@ -310,7 +311,7 @@ export default function EquipePage() {
                       <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
                         {/* Link de agendamento personalizado */}
                         <div style={{padding:'8px 12px',background:'#ECFDF5',borderRadius:9,border:'1px solid #6EE7B7'}}>
-                          <div style={{fontSize:11,fontWeight:700,color:'#065F46',marginBottom:4}}>✂️ Link de agendamento pessoal:</div>
+                          <div style={{fontSize:11,fontWeight:700,color:'#065F46',marginBottom:4,display:'flex',alignItems:'center',gap:4}}><LinkIcon size={10} color="#065F46"/> Link de agendamento pessoal:</div>
                           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                             <code style={{fontSize:10,color:'#065F46',flex:1,wordBreak:'break-all',background:'#fff',padding:'4px 8px',borderRadius:6,border:'1px solid #6EE7B7'}}>
                               {bookingLink(b)}
@@ -324,7 +325,7 @@ export default function EquipePage() {
                         {/* Link de setup (login) — só se ainda não configurou */}
                         {b.email && !b.user_id && (
                           <div style={{padding:'8px 12px',background:'var(--navy-50)',borderRadius:9,border:'1px solid var(--navy-200)'}}>
-                            <div style={{fontSize:11,fontWeight:700,color:'var(--navy-700)',marginBottom:4}}>🔑 Link para criar senha (envie UMA vez):</div>
+                            <div style={{fontSize:11,fontWeight:700,color:'var(--navy-700)',marginBottom:4,display:'flex',alignItems:'center',gap:4}}><Key size={10} color="var(--navy-700)"/> Link para criar senha (envie UMA vez):</div>
                             <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                               <code style={{fontSize:10,color:'var(--navy-600)',flex:1,wordBreak:'break-all',background:'#fff',padding:'4px 8px',borderRadius:6,border:'1px solid var(--navy-200)'}}>
                                 {setupLink(b)}
@@ -339,7 +340,7 @@ export default function EquipePage() {
                       </div>
                     )}
                     {b.user_id && (
-                      <div style={{marginTop:4,fontSize:11,color:'var(--success)',fontWeight:600}}>✓ Conta criada — acesso ativo</div>
+                      <div style={{marginTop:4,fontSize:11,color:'var(--success)',fontWeight:600,display:'flex',alignItems:'center',gap:4}}><Check size={11} color="var(--success)"/> Conta criada — acesso ativo</div>
                     )}
                   </div>
                   {/* Ações */}
@@ -348,7 +349,7 @@ export default function EquipePage() {
                       sessionStorage.setItem('ms_barber_view',JSON.stringify({barberId:b.id,barberName:b.name,salonId:salon?.id,timestamp:Date.now()}))
                       window.location.href='/dashboard'
                     }} style={{padding:'5px 10px',borderRadius:8,border:'1px solid #C4B5FD',background:'#F5F3FF',color:'#5B21B6',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>
-                      👁 Ver como
+                      <Eye size={12} color="currentColor" style={{marginRight:4}}/> Ver como
                     </button>}
                     <button onClick={()=>startEdit(b)}
                       style={{padding:'6px 12px',borderRadius:8,border:'1px solid var(--border)',background:'var(--white)',color:'var(--muted)',fontSize:11,fontWeight:700,cursor:'pointer'}}>
