@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSalon } from '../../../lib/useSalon'
 import { createClient } from '../../../lib/supabase'
-import { Settings, Link, Check, AlertCircle } from '../../../lib/icons'
+import { Store, Camera, Check, MessageCircle, Eye, Share2, Copy } from '../../../lib/icons'
 
 export default function ConfiguracoesPage() {
   const { salon, user, loading: sl } = useSalon()
@@ -141,7 +141,7 @@ export default function ConfiguracoesPage() {
                   <img src={logoPreview} alt="Logo" style={{width:96,height:96,borderRadius:16,objectFit:'cover',border:'2px solid var(--border)'}}/>
                 ) : (
                   <div style={{width:96,height:96,borderRadius:16,background:'var(--navy-50)',border:'2px dashed var(--border)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--muted)'}}>
-                    <div style={{fontSize:32}}>🏪</div>
+                    <div style={{display:'flex',justifyContent:'center',marginBottom:0,opacity:.3}}><Store size={32}/></div>
                     <div style={{fontSize:10,marginTop:4}}>Sem logo</div>
                   </div>
                 )}
@@ -156,7 +156,7 @@ export default function ConfiguracoesPage() {
               <div style={{flex:1,minWidth:200}}>
                 <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleLogoFile} />
                 <button onClick={()=>fileRef.current?.click()} className="btn-primary" style={{marginBottom:10}}>
-                  {uploadingLogo ? 'Fazendo upload...' : '📷 Escolher imagem'}
+                  {uploadingLogo ? 'Fazendo upload...' : <><Camera size={13} color="currentColor" style={{marginRight:5}}/> Escolher imagem</>}
                 </button>
                 <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.6}}>
                   Formatos aceitos: JPG, PNG, WebP<br/>
@@ -224,7 +224,7 @@ export default function ConfiguracoesPage() {
 
           {/* Botão salvar */}
           <button onClick={save} disabled={saving||uploadingLogo} className="btn-primary" style={{width:'100%',padding:'13px',fontSize:15,borderRadius:12,justifyContent:'center'}}>
-            {saving ? 'Salvando...' : saved ? '✓ Salvo com sucesso!' : 'Salvar alterações'}
+            {saving ? 'Salvando...' : saved ? <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Check size={13} color="currentColor"/> Salvo com sucesso!</span> : 'Salvar alterações'}
           </button>
         </div>
       )}
@@ -239,17 +239,17 @@ export default function ConfiguracoesPage() {
             <div style={{display:'flex',gap:8,background:'var(--navy-50)',borderRadius:12,padding:'12px 16px',border:'1px solid var(--navy-200)',marginBottom:14}}>
               <span style={{flex:1,fontSize:13,color:'var(--navy-700)',fontWeight:600,wordBreak:'break-all'}}>{bookingLink}</span>
               <button onClick={copiar} className="btn-primary" style={{flexShrink:0,fontSize:12,padding:'6px 14px',background:copied?'var(--success)':'var(--navy-600)'}}>
-                {copied?'✓ Copiado!':'Copiar'}
+                {copied?<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Check size={11} color="#059669"/> Copiado!</span>:<span style={{display:'inline-flex',alignItems:'center',gap:4}}><Copy size={11} color="currentColor"/> Copiar</span>}
               </button>
             </div>
 
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
               <a href={`https://wa.me/?text=${encodeURIComponent(`Agende no ${salon?.name}: ${bookingLink}`)}`} target="_blank" rel="noreferrer"
                 className="btn-primary" style={{background:'#25D366',fontSize:13,display:'flex',alignItems:'center',gap:6}}>
-                💬 Compartilhar no WhatsApp
+                <MessageCircle size={13} color="currentColor" style={{marginRight:5}}/> Compartilhar no WhatsApp
               </a>
               <button onClick={()=>window.open(bookingLink,'_blank')} className="btn-secondary" style={{display:'flex',alignItems:'center',gap:6}}>
-                👁 Visualizar página
+                <Eye size={13} color="currentColor" style={{marginRight:5}}/> Visualizar página
               </button>
             </div>
 
@@ -295,7 +295,7 @@ export default function ConfiguracoesPage() {
             </div>
             <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.7}}>
               Para alterar seu plano ou gerenciar pagamentos, entre em contato:<br/>
-              <a href="https://wa.me/5511999999999" target="_blank" rel="noreferrer" style={{color:'var(--navy-600)',fontWeight:700}}>💬 Falar com suporte via WhatsApp</a>
+              <a href="https://wa.me/5511999999999" target="_blank" rel="noreferrer" style={{color:'var(--navy-600)',fontWeight:700}} style={{display:"inline-flex",alignItems:"center",gap:5}}><MessageCircle size={13} color="currentColor"/> Falar com suporte via WhatsApp</a>
             </div>
           </div>
 
