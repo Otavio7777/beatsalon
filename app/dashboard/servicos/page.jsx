@@ -5,19 +5,18 @@ import { useSalon } from '../../../lib/useSalon'
 import { Search, X } from '../../../lib/icons'
 
 const CATEGORIAS = [
-  {id:'cabelo',   label:'Cabelo'},
-  {id:'barba',    label:'Barba'},
-  {id:'coloracao',label:'Coloração'},
-  {id:'estetica', label:'Estética'},
-  {id:'unhas',    label:'Unhas'},
-  {id:'sobrancelha',label:'Sobrancelha'},
-  {id:'massagem', label:'Massagem'},
-  {id:'geral',    label:'Geral'},
+  {id:'cabelo',      label:'Cabelo'},
+  {id:'barba',       label:'Barba'},
+  {id:'coloracao',   label:'Coloração'},
+  {id:'estetica',    label:'Estética'},
+  {id:'unhas',       label:'Unhas'},
+  {id:'sobrancelha', label:'Sobrancelha'},
+  {id:'massagem',    label:'Massagem'},
+  {id:'geral',       label:'Geral'},
 ]
-const catIcon = (c) => ''
 const catLabel = (c) => CATEGORIAS.find(x=>x.id===c)?.label || c
 
-function ServicoModal({ salonId, servico, onClose, onSaved }) {
+function ServicoModal({ salonId, servico, onClose, onSaved, readOnly }) {
   const [form, setForm] = useState({
     name:'', category:'cabelo', price:'', cost:'', duration:60, description:'', active:true, ...servico
   })
@@ -26,6 +25,7 @@ function ServicoModal({ salonId, servico, onClose, onSaved }) {
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
   const save = async () => {
+    if (readOnly) return
     if (!form.name.trim()) return
     setSaving(true)
     const payload = { ...form, salon_id:salonId, price:Number(form.price)||0, duration:Number(form.duration)||60 }
@@ -36,58 +36,80 @@ function ServicoModal({ salonId, servico, onClose, onSaved }) {
     setSaving(false)
   }
 
+  const INP = (disabled) => ({
+    width:'100%', padding:'10px 14px', borderRadius:10,
+    border:'1px solid #E3E1F0', fontSize:14, outline:'none',
+    marginBottom:12, boxSizing:'border-box',
+    background: disabled ? '#F8FAFC' : '#fff',
+    color: disabled ? '#94A3B8' : '#1A1825',
+    cursor: disabled ? 'not-allowed' : 'text',
+  })
+
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box">
-        <div style={{fontSize:18,fontWeight:800,marginBottom:20}}>{servico?.id?'Editar serviço':'Novo serviço'}</div>
+        <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>
+          {readOnly ? 'Detalhes do serviço' : servico?.id ? 'Editar serviço' : 'Novo serviço'}
+        </div>
+        {readOnly && (
+          <div style={{fontSize:12,color:'#D97706',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:8,padding:'6px 12px',marginBottom:14}}>
+            Você pode visualizar mas não alterar preços de serviços.
+          </div>
+        )}
 
-        <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Nome do serviço *</label>
-        <input style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid #E3E1F0',fontSize:14,outline:'none',marginBottom:12,boxSizing:'border-box'}}
-          placeholder="Ex: Corte Masculino" value={form.name} onChange={e=>set('name',e.target.value)} />
+        <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Nome do serviço</label>
+        <input style={INP(readOnly)} placeholder="Ex: Corte Masculino" value={form.name}
+          onChange={e=>!readOnly&&set('name',e.target.value)} readOnly={readOnly} />
 
         <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Categoria</label>
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:12}}>
           {CATEGORIAS.map(c=>(
-            <button key={c.id} onClick={()=>set('category',c.id)} style={{
-              padding:'8px 4px',borderRadius:8,border:`2px solid ${form.category===c.id?'#534AB7':'#E3E1F0'}`,
-              background:form.category===c.id?'#534AB7':'#fff',cursor:'pointer',textAlign:'center',
+            <button key={c.id} onClick={()=>!readOnly&&set('category',c.id)} style={{
+              padding:'8px 4px',borderRadius:8,
+              border:`2px solid ${form.category===c.id?'#534AB7':'#E3E1F0'}`,
+              background:form.category===c.id?'#534AB7':'#fff',cursor:readOnly?'default':'pointer',
               color:form.category===c.id?'#fff':'#8A87A0',fontSize:11,fontWeight:600,
-            }}>
-              
-              {c.label}
-            </button>
+            }}>{c.label}</button>
           ))}
         </div>
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
           <div>
-            <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Preço (R$)</label>
-            <input style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid #E3E1F0',fontSize:14,outline:'none',boxSizing:'border-box'}}
-              type="number" placeholder="0" value={form.price} onChange={e=>set('price',e.target.value)} />
+            <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>
+              Preço (R$) {readOnly && <span style={{color:'#DC2626'}}>🔒</span>}
+            </label>
+            <input style={INP(true)} type="number" placeholder="0"
+              value={form.price} readOnly={true} />
+            {readOnly && <div style={{fontSize:10,color:'#94A3B8',marginTop:-8,marginBottom:4}}>Somente o gestor pode alterar</div>}
           </div>
           <div>
             <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Duração (min)</label>
-            <input style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid #E3E1F0',fontSize:14,outline:'none',boxSizing:'border-box'}}
-              type="number" placeholder="60" value={form.duration} onChange={e=>set('duration',e.target.value)} />
+            <input style={INP(readOnly)} type="number" placeholder="60"
+              value={form.duration} onChange={e=>!readOnly&&set('duration',e.target.value)} readOnly={readOnly} />
           </div>
         </div>
 
         <label style={{fontSize:11,fontWeight:700,color:'#8A87A0',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6,display:'block'}}>Descrição</label>
-        <input style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid #E3E1F0',fontSize:14,outline:'none',marginBottom:16,boxSizing:'border-box'}}
-          placeholder="Descrição opcional do serviço" value={form.description} onChange={e=>set('description',e.target.value)} />
+        <input style={INP(readOnly)} placeholder="Descrição opcional" value={form.description}
+          onChange={e=>!readOnly&&set('description',e.target.value)} readOnly={readOnly} />
 
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20,padding:'12px',background:'#F2F1F8',borderRadius:10}}>
-          <span style={{fontSize:13,fontWeight:600,flex:1}}>Serviço ativo (visível no link público)</span>
-          <div onClick={()=>set('active',!form.active)} style={{width:44,height:24,borderRadius:12,background:form.active?'#534AB7':'#D4D2DF',cursor:'pointer',position:'relative',transition:'background .2s'}}>
-            <div style={{width:20,height:20,borderRadius:10,background:'#fff',position:'absolute',top:2,left:form.active?22:2,transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/>
+        {!readOnly && (
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20,padding:'12px',background:'#F2F1F8',borderRadius:10}}>
+            <span style={{fontSize:13,fontWeight:600,flex:1}}>Serviço ativo</span>
+            <div onClick={()=>set('active',!form.active)} style={{width:44,height:24,borderRadius:12,background:form.active?'#534AB7':'#D4D2DF',cursor:'pointer',position:'relative',transition:'background .2s'}}>
+              <div style={{width:20,height:20,borderRadius:10,background:'#fff',position:'absolute',top:2,left:form.active?22:2,transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/></div>
           </div>
-        </div>
+        )}
 
         <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-          <button onClick={onClose} style={{padding:'9px 18px',borderRadius:10,border:'1px solid #E3E1F0',background:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',color:'#8A87A0'}}>Cancelar</button>
-          <button onClick={save} disabled={saving} style={{padding:'9px 20px',borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
-            {saving?'Salvando...':'Salvar serviço'}
+          <button onClick={onClose} style={{padding:'9px 18px',borderRadius:10,border:'1px solid #E3E1F0',background:'#fff',fontSize:13,fontWeight:600,cursor:'pointer',color:'#8A87A0'}}>
+            {readOnly ? 'Fechar' : 'Cancelar'}
           </button>
+          {!readOnly && (
+            <button onClick={save} disabled={saving} style={{padding:'9px 20px',borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              {saving?'Salvando...':'Salvar serviço'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -95,7 +117,7 @@ function ServicoModal({ salonId, servico, onClose, onSaved }) {
 }
 
 export default function ServicosPage() {
-  const { salon, user, loading: sl } = useSalon()
+  const { salon, user, loading: sl, isBarber } = useSalon()
   const [servicos, setServicos] = useState([])
   const [loading, setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -116,12 +138,14 @@ export default function ServicosPage() {
   useEffect(()=>{ if(!sl&&!user) window.location.href='/login' },[sl,user])
 
   const del = async (id) => {
+    if (isBarber) return
     if (!confirm('Remover serviço?')) return
     await sb.from('services').delete().eq('id',id)
     load()
   }
 
   const toggleActive = async (svc) => {
+    if (isBarber) return
     await sb.from('services').update({active:!svc.active}).eq('id',svc.id)
     load()
   }
@@ -140,8 +164,16 @@ export default function ServicosPage() {
     <div className="pg">
       <div className="pg-hd">
         <div style={{fontSize:22,fontWeight:800,color:'#1A1825'}}>Serviços</div>
-        <div style={{fontSize:12,color:'#8A87A0',marginTop:3}}>Catálogo de serviços · {salon?.name}</div>
+        <div style={{fontSize:12,color:'#8A87A0',marginTop:3}}>
+          {isBarber ? 'Visualização — preços só o gestor pode alterar' : `Catálogo de serviços · ${salon?.name}`}
+        </div>
       </div>
+
+      {isBarber && (
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:10,marginBottom:16,fontSize:13,color:'#92400E'}}>
+          Você pode ver os serviços e preços, mas apenas o gestor pode fazer alterações.
+        </div>
+      )}
 
       <div className="grid-3" style={{marginBottom:20}}>
         <div className="mc"><div className="mc-label">Total</div><div className="mc-value">{servicos.length}</div><div className="mc-desc">serviços</div></div>
@@ -154,10 +186,11 @@ export default function ServicosPage() {
           <Search size={14} color="#8A87A0"/>
           <input className="search-inp" placeholder="Buscar serviço..." value={search} onChange={e=>setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary" onClick={()=>{setEditSvc(null);setShowModal(true)}}>＋ Serviço</button>
+        {!isBarber && (
+          <button className="btn-primary" onClick={()=>{setEditSvc(null);setShowModal(true)}}>＋ Serviço</button>
+        )}
       </div>
 
-      {/* Filtro categorias */}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:16}}>
         {['todos',...CATEGORIAS.map(c=>c.id)].map(c=>(
           <button key={c} onClick={()=>setCatFilter(c)} className={`filter-btn${catFilter===c?' active':''}`}>
@@ -166,19 +199,16 @@ export default function ServicosPage() {
         ))}
       </div>
 
-      {/* Lista */}
       {loading ? <div style={{textAlign:'center',color:'#8A87A0',padding:32}}>Carregando...</div>
       : filtered.length===0 ? (
         <div style={{textAlign:'center',color:'#8A87A0',padding:32,background:'#fff',borderRadius:16,border:'1px solid #E3E1F0'}}>
-          {search||catFilter!=='todos'?'Nenhum serviço encontrado.':'Nenhum serviço ainda. Clique em "+ Serviço" para adicionar.'}
+          {search||catFilter!=='todos'?'Nenhum serviço encontrado.':'Nenhum serviço ainda.'}
         </div>
       ) : (
         <div style={{display:'grid',gap:8}}>
           {filtered.map(svc=>(
             <div key={svc.id} style={{background:'#fff',borderRadius:14,padding:'14px 16px',border:'1px solid #E3E1F0',display:'flex',alignItems:'center',gap:12,opacity:svc.active?1:.6}}>
-              <div style={{width:44,height:44,borderRadius:12,background:'#F2F1F8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}>
-                
-              </div>
+              <div style={{width:44,height:44,borderRadius:12,background:'#F2F1F8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,flexShrink:0}}></div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                   <span style={{fontWeight:700,fontSize:14}}>{svc.name}</span>
@@ -192,11 +222,19 @@ export default function ServicosPage() {
                 </div>
               </div>
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <div onClick={()=>toggleActive(svc)} style={{width:36,height:20,borderRadius:10,background:svc.active?'#534AB7':'#D4D2DF',cursor:'pointer',position:'relative',transition:'background .2s',flexShrink:0}}>
-                  <div style={{width:16,height:16,borderRadius:8,background:'#fff',position:'absolute',top:2,left:svc.active?18:2,transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/>
-                </div>
-                <button className="btn-ghost" onClick={()=>{setEditSvc(svc);setShowModal(true)}}>Editar</button>
-                <button className="btn-danger" style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'5px 8px'}} onClick={()=>del(svc.id)}><X size={12} color="currentColor"/></button>
+                {!isBarber && (
+                  <div onClick={()=>toggleActive(svc)} style={{width:36,height:20,borderRadius:10,background:svc.active?'#534AB7':'#D4D2DF',cursor:'pointer',position:'relative',transition:'background .2s',flexShrink:0}}>
+                    <div style={{width:16,height:16,borderRadius:8,background:'#fff',position:'absolute',top:2,left:svc.active?18:2,transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/>
+                  </div>
+                )}
+                <button className="btn-ghost" onClick={()=>{setEditSvc(svc);setShowModal(true)}}>
+                  {isBarber ? 'Ver' : 'Editar'}
+                </button>
+                {!isBarber && (
+                  <button className="btn-danger" style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'5px 8px'}} onClick={()=>del(svc.id)}>
+                    <X size={12} color="currentColor"/>
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -204,7 +242,7 @@ export default function ServicosPage() {
       )}
 
       {showModal && salon && (
-        <ServicoModal salonId={salon.id} servico={editSvc} onClose={()=>setShowModal(false)} onSaved={load} />
+        <ServicoModal salonId={salon.id} servico={editSvc} onClose={()=>setShowModal(false)} onSaved={load} readOnly={isBarber} />
       )}
     </div>
   )
