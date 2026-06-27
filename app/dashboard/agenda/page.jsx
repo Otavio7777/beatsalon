@@ -440,6 +440,140 @@ function RemarcarModal({ appt, salonName, salonId, schedCfg=[], onClose, onSaved
 }
 
 
+/* ── Modal Concluir Atendimento ── */
+function ConcludeModal({ appt, salonName, onClose, onSaved }) {
+  const [modo, setModo]       = useState('realizado') // 'realizado' | 'faltou'
+  const [pagamento, setPagamento] = useState('pix')
+  const [valor, setValor]     = useState(String(appt?.value || ''))
+  const [saving, setSaving]   = useState(false)
+  const [done, setDone]       = useState(false)
+  const sb = createClient()
+
+  const PAGAMENTOS = [
+    { key:'pix',     label:'PIX' },
+    { key:'dinheiro',label:'Dinheiro' },
+    { key:'debito',  label:'Débito' },
+    { key:'credito', label:'Crédito' },
+  ]
+
+  const salvar = async () => {
+    setSaving(true)
+    const val = Number(valor) || 0
+    if (modo === 'realizado') {
+      await sb.from('appointments').update({
+        status: 'concluido',
+        payment_method: pagamento,
+        value: val,
+        price: val,
+      }).eq('id', appt.id)
+      // Atualiza CRM do cliente
+      if (appt.client_id) {
+        const { data: cur } = await sb.from('clients')
+          .select('visit_count,ltv,first_visit').eq('id', appt.client_id).single()
+        if (cur) {
+          await sb.from('clients').update({
+            visit_count: (cur.visit_count || 0) + 1,
+            ltv: (cur.ltv || 0) + val,
+            last_visit: appt.date?.slice(0, 10),
+            first_visit: cur.first_visit || appt.date?.slice(0, 10),
+            status: 'ativo',
+          }).eq('id', appt.client_id)
+        }
+      }
+    } else {
+      await sb.from('appointments').update({ status: 'faltou' }).eq('id', appt.id)
+    }
+    setSaving(false)
+    setDone(true)
+    onSaved()
+    setTimeout(onClose, 1400)
+  }
+
+  const phone = appt.notes?.match(/\d{10,11}/)?.[0] || appt.client_phone?.replace(/\D/g, '')
+  const waMsg = modo === 'faltou' && phone
+    ? `Olá ${appt.client_name?.split(' ')[0]}! Sentimos sua falta no horário de hoje em *${salonName}*. Que tal remarcarmos? 📅`
+    : null
+  const waHref = waMsg ? `https://wa.me/55${phone}?text=${encodeURIComponent(waMsg)}` : null
+
+  const iS = { border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'9px 13px', fontSize:13, outline:'none', width:'100%', boxSizing:'border-box', background:'var(--white)', color:'var(--text)' }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div style={{width:40,height:4,borderRadius:2,background:'#E2E8F0',margin:'0 auto 20px'}}/>
+        <div style={{fontSize:17,fontWeight:800,color:'var(--navy-900)',marginBottom:4}}>Concluir atendimento</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:20,paddingBottom:16,borderBottom:'1px solid #F1F5F9'}}>
+          <strong style={{color:'var(--navy-900)'}}>{appt.client_name}</strong> · {appt.service_name}
+        </div>
+
+        {done ? (
+          <div style={{padding:'20px',textAlign:'center',color:'var(--success)',fontWeight:700,fontSize:15,background:'var(--success-light)',borderRadius:12}}>
+            <Check size={22} color="var(--success)" style={{display:'block',margin:'0 auto 8px'}}/> 
+            {modo==='realizado' ? 'Atendimento concluído!' : 'Marcado como faltou!'}
+          </div>
+        ) : (
+          <>
+            {/* Modo */}
+            <div style={{display:'flex',gap:8,marginBottom:18}}>
+              {[['realizado','✓ Realizado'],['faltou','✗ Não compareceu']].map(([m,l])=>(
+                <button key={m} onClick={()=>setModo(m)}
+                  style={{flex:1,padding:'10px 8px',borderRadius:10,border:`2px solid ${modo===m?'var(--navy-600)':'var(--border)'}`,
+                    background:modo===m?'var(--navy-600)':'var(--white)',color:modo===m?'#fff':'var(--muted)',
+                    fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {modo === 'realizado' && (
+              <>
+                <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:6}}>Valor cobrado (R$)</label>
+                <input style={{...iS, marginBottom:16}} type="number" value={valor}
+                  onChange={e=>setValor(e.target.value)} placeholder="0.00" />
+
+                <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:8}}>Forma de pagamento</label>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:18}}>
+                  {PAGAMENTOS.map(p=>(
+                    <button key={p.key} onClick={()=>setPagamento(p.key)}
+                      style={{padding:'10px 8px',borderRadius:10,border:`2px solid ${pagamento===p.key?'var(--navy-600)':'var(--border)'}`,
+                        background:pagamento===p.key?'var(--navy-50)':'var(--white)',color:pagamento===p.key?'var(--navy-700)':'var(--muted)',
+                        fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {modo === 'faltou' && waHref && (
+              <div style={{marginBottom:16,padding:'10px 14px',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:10}}>
+                <div style={{fontSize:12,color:'#92400E',fontWeight:600,marginBottom:6}}>Avisar o cliente via WhatsApp?</div>
+                <a href={waHref} target="_blank" rel="noreferrer"
+                  style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:8,background:'#25D366',color:'#fff',fontSize:12,fontWeight:700,textDecoration:'none'}}>
+                  <MessageSquare size={12} color="#fff"/> Enviar mensagem
+                </a>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={onClose}
+                style={{flex:1,padding:'12px',borderRadius:10,border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                Cancelar
+              </button>
+              <button onClick={salvar} disabled={saving}
+                style={{flex:2,padding:'12px',borderRadius:10,border:'none',
+                  background:modo==='realizado'?'var(--navy-600)':'var(--warning)',
+                  color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                {saving ? 'Salvando...' : modo==='realizado' ? 'Confirmar conclusão' : 'Confirmar falta'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AgendaPage() {
   const { salon, user, loading:sl } = useSalon()
   const [appts, setAppts]     = useState([])
@@ -452,13 +586,18 @@ export default function AgendaPage() {
   const [barberFiltro, setBarberFiltro] = useState('todos')
   const [showModal, setShowModal] = useState(false)
   const [editAppt, setEditAppt]  = useState(null)
+  const [schedCfg, setSchedCfg]  = useState([])
   const sb = createClient()
 
   const load = useCallback(async()=>{
     if (!salon?.id) return
     setLoading(true)
-    const {data} = await sb.from('appointments').select('*').eq('salon_id',salon.id).order('date')
+    const [{ data }, { data: sched }] = await Promise.all([
+      sb.from('appointments').select('*').eq('salon_id', salon.id).order('date'),
+      sb.from('schedule_config').select('*').eq('salon_id', salon.id),
+    ])
     setAppts(data||[])
+    setSchedCfg(sched||[])
     setLoading(false)
   },[salon?.id])
 
