@@ -1,15 +1,29 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase'
 
 export default function LoginPage() {
-  const [email,   setEmail]   = useState('')
-  const [password,setPassword]= useState('')
-  const [error,   setError]   = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email,      setEmail]      = useState('')
+  const [password,   setPassword]   = useState('')
+  const [error,      setError]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+  const [barberName, setBarberName] = useState(null) // nome do barbeiro se encontrado
+  const [lookupDone, setLookupDone] = useState(false)
   const router = useRouter()
   const sb     = createClient()
+
+  // Busca o nome do barbeiro quando o e-mail perde o foco
+  const lookupBarber = useCallback(async (emailVal) => {
+    if (!emailVal || !emailVal.includes('@')) { setBarberName(null); return }
+    try {
+      const { data } = await sb.rpc('get_barber_name_by_email', { p_email: emailVal.trim().toLowerCase() })
+      setBarberName(data || null)
+    } catch(e) {
+      setBarberName(null)
+    }
+    setLookupDone(true)
+  }, [])
 
   const login = async () => {
     if (!email||!password) { setError('Preencha e-mail e senha.'); return }
@@ -18,7 +32,6 @@ export default function LoginPage() {
     const { data, error:e } = await sb.auth.signInWithPassword({ email, password })
     if (e) { setError('E-mail ou senha incorretos.'); setLoading(false); return }
 
-    // Verifica se o salão está ativo
     const { data: salon } = await sb.from('salons').select('is_active').eq('owner_id', data.user.id).maybeSingle()
     if (salon && salon.is_active === false) {
       await sb.auth.signOut()
@@ -43,11 +56,28 @@ export default function LoginPage() {
       </div>
 
       <div style={{ width:'100%', maxWidth:400, background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:'32px 28px', backdropFilter:'blur(20px)', boxShadow:'0 24px 60px rgba(0,0,0,.35)' }}>
-        <h2 style={{ fontSize:20, fontWeight:800, color:'#fff', marginBottom:6 }}>Entrar na conta</h2>
-        <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:24 }}>Gerencie seu salão com inteligência.</p>
+
+        {/* Saudação personalizada para barbeiro */}
+        {barberName ? (
+          <div style={{ marginBottom:20, padding:'12px 16px', background:'rgba(36,81,160,.2)', border:'1px solid rgba(36,81,160,.35)', borderRadius:12 }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'#fff', marginBottom:2 }}>Olá, {barberName}!</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,.5)' }}>Entre com sua senha para acessar o sistema.</div>
+          </div>
+        ) : (
+          <>
+            <h2 style={{ fontSize:20, fontWeight:800, color:'#fff', marginBottom:6 }}>Entrar na conta</h2>
+            <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:24 }}>Gerencie seu salão com inteligência.</p>
+          </>
+        )}
 
         <label style={{ display:'block', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:6 }}>E-mail</label>
-        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" style={{ ...inp, marginBottom:14 }} />
+        <input
+          type="email" value={email}
+          onChange={e=>{ setEmail(e.target.value); setLookupDone(false); setBarberName(null) }}
+          onBlur={e=>lookupBarber(e.target.value)}
+          placeholder="seu@email.com"
+          style={{ ...inp, marginBottom:14 }}
+        />
 
         <label style={{ display:'block', fontSize:11, fontWeight:700, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom:6 }}>Senha</label>
         <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" style={{ ...inp, marginBottom:20 }} onKeyDown={e=>e.key==='Enter'&&login()} />
