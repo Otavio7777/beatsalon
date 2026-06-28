@@ -508,7 +508,7 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
 
         {done ? (
           <div style={{padding:'20px',textAlign:'center',color:'var(--success)',fontWeight:700,fontSize:15,background:'var(--success-light)',borderRadius:12}}>
-            <Check size={22} color="var(--success)" style={{display:'block',margin:'0 auto 8px'}}/> 
+            <div style={{display:'flex',justifyContent:'center',marginBottom:8}}><Check size={22} color="var(--success)"/></div>
             {modo==='realizado' ? 'Atendimento concluído!' : 'Marcado como faltou!'}
           </div>
         ) : (
