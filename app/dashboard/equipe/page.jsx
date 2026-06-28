@@ -2,7 +2,7 @@
 import { Users, Scissors, Mail, Smartphone, Key, Check, Eye, Link as LinkIcon, LogIn } from '../../../lib/icons'
 import { useState, useEffect } from 'react'
 import { useSalon } from '../../../lib/useSalon'
-import { bookingURL, barberSetupURL } from '../../../lib/config'
+import { barberProfileURL, barberSetupURL } from '../../../lib/config'
 import { createClient } from '../../../lib/supabase'
 
 const PLAN_LIMITS = {
@@ -232,7 +232,7 @@ export default function EquipePage() {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {barbers.map((b,i)=>{
             const setupLink = barberSetupURL(salon.id, b.email, b.name)
-            const bookLink  = bookingURL(salon.id, b.id)
+            const profileLink = barberProfileURL(b.id)
             return (
               <div key={b.id} style={{
                 background:'#fff', border:'1.5px solid #E2E8F0', borderRadius:14,
@@ -303,7 +303,7 @@ export default function EquipePage() {
                   }}>
                     <Key size={12}/> Link de acesso
                   </button>
-                  <button onClick={()=>copyLink(bookLink)} style={{
+                  <button onClick={()=>copyLink(profileLink)} style={{
                     display:'flex', alignItems:'center', gap:5,
                     padding:'7px 12px', borderRadius:9, border:'1.5px solid #E2E8F0',
                     background:'#fff', color:'#64748B', fontSize:12, fontWeight:600, cursor:'pointer',
