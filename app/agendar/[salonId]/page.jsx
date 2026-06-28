@@ -17,6 +17,20 @@ function fmtPreco(p) { return p > 0 ? `R$${Number(p).toLocaleString('pt-BR')}` :
 function fmtDur(m) { if (!m) return ''; const h=Math.floor(m/60),r=m%60; return r?`${h?h+'h':''}${r}min`:`${h}h` }
 function formatPhone(v) { return v.replace(/\D/g,'').slice(0,11).replace(/(\d{2})(\d{4,5})(\d{4})/,'($1) $2-$3') }
 
+/* Avatar simples */
+function AvatarCircle({ name, color, size=52 }) {
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:size/2,
+      background:color||'#1B3057',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:size*.38, fontWeight:800, color:'#fff', flexShrink:0,
+    }}>
+      {(name||'?')[0].toUpperCase()}
+    </div>
+  )
+}
+
 /* Calendário */
 function Cal({ valor, onChange, blockedDates=[], schedCfg=[] }) {
   const agora = today()
@@ -62,24 +76,24 @@ function Cal({ valor, onChange, blockedDates=[], schedCfg=[] }) {
 }
 
 /* Indicador de progresso */
-function Progress({ etapa, total }) {
-  const passos = ['Quem é você','Serviços','Data e Hora','Confirmar']
+function Progress({ etapa, passos }) {
+  const total = passos.length
   return (
     <div style={{padding:'0 4px',marginBottom:20}}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
         {passos.map((p,i)=>(
           <div key={i} style={{textAlign:'center',flex:1}}>
             <div style={{width:28,height:28,borderRadius:14,margin:'0 auto 4px',display:'flex',alignItems:'center',justifyContent:'center',
-              background:etapa>i+1?'#059669':etapa===i+1?'#1B3057':'#E2E8F0',
-              fontSize:11,fontWeight:800,color:etapa>=i+1?'#fff':'#94A3B8',transition:'all .2s'}}>
-              {etapa>i+1?'✓':i+1}
+              background:etapa>i?'#059669':etapa===i?'#1B3057':'#E2E8F0',
+              fontSize:11,fontWeight:800,color:etapa>=i?'#fff':'#94A3B8',transition:'all .2s'}}>
+              {etapa>i?'✓':i+1}
             </div>
-            <div style={{fontSize:9,fontWeight:700,color:etapa===i+1?'#1B3057':'#94A3B8',textTransform:'uppercase',letterSpacing:'.3px',display:etapa===i+1?'block':'none'}}>{p}</div>
+            <div style={{fontSize:9,fontWeight:700,color:etapa===i?'#1B3057':'#94A3B8',textTransform:'uppercase',letterSpacing:'.3px',display:etapa===i?'block':'none'}}>{p}</div>
           </div>
         ))}
       </div>
       <div style={{height:3,background:'#E2E8F0',borderRadius:2,overflow:'hidden'}}>
-        <div style={{height:'100%',background:'#1B3057',borderRadius:2,transition:'width .3s',width:`${((etapa-1)/(total-1))*100}%`}}/>
+        <div style={{height:'100%',background:'#1B3057',borderRadius:2,transition:'width .3s',width:`${(etapa/(total-1))*100}%`}}/>
       </div>
     </div>
   )
@@ -121,7 +135,11 @@ export default function AgendarPage({ params }) {
   const [loading,     setLoading]     = useState(true)
   const [notFound,    setNotFound]    = useState(false)
 
-  // Fluxo
+  // Barbeiros
+  const [barbers,     setBarbers]     = useState([])
+  const [showBarberStep, setShowBarberStep] = useState(false)
+
+  // Fluxo — etapa 0=barbeiro (opcional), 1=identidade, 2=serviços, 3=data/hora, 4=confirmar
   const [etapa,       setEtapa]       = useState(1)
 
   // Etapa 1: Identidade
@@ -129,10 +147,10 @@ export default function AgendarPage({ params }) {
   const [nome,        setNome]        = useState('')
   const [origem,      setOrigem]      = useState('')
   const [lookingUp,   setLookingUp]   = useState(false)
-  const [clienteEncontrado, setClienteEncontrado] = useState(null) // cliente do banco
-  const [proximosAppts, setProximosAppts] = useState([]) // agendamentos futuros
-  const [isNewClient, setIsNewClient] = useState(null) // null=não verificado, true/false
-  const [outraPessoa, setOutraPessoa] = useState(false) // quer agendar para outra pessoa
+  const [clienteEncontrado, setClienteEncontrado] = useState(null)
+  const [proximosAppts, setProximosAppts] = useState([])
+  const [isNewClient, setIsNewClient] = useState(null)
+  const [outraPessoa, setOutraPessoa] = useState(false)
 
   // Etapa 2: Serviços
   const [selecionados, setSelecionados] = useState([])
@@ -143,8 +161,9 @@ export default function AgendarPage({ params }) {
   const [horaSel,     setHoraSel]     = useState('')
   const [ocupados,    setOcupados]    = useState([])
 
-  // Barbeiro selecionado (via ?barber=id na URL)
+  // Barbeiro selecionado
   const [barberId,    setBarberId]    = useState(null)
+  const [barberName,  setBarberName]  = useState(null)
 
   // Etapa 4: Confirmar
   const [obs,         setObs]         = useState('')
@@ -161,30 +180,55 @@ export default function AgendarPage({ params }) {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(salonId)
 
     // Captura barbeiro da URL (?barber=id)
+    let urlBarber = null
     if (typeof window !== 'undefined') {
-      const urlBarber = new URLSearchParams(window.location.search).get('barber')
+      urlBarber = new URLSearchParams(window.location.search).get('barber')
       if (urlBarber) setBarberId(urlBarber)
     }
 
-    const loadById = (id) => Promise.all([
-      sb.from('salons').select('*').eq('id',id).single(),
-      sb.from('services').select('id,name,price,duration,category').eq('salon_id',id).eq('active',true).order('name'),
-      sb.from('blocked_dates').select('date').eq('salon_id',id),
-      sb.from('schedule_config').select('*').eq('salon_id',id),
-    ]).then(([{data:s,error:e},{data:sv},{data:bl},{data:sc}])=>{
+    const loadById = async (id) => {
+      const [
+        {data:s,error:e},
+        {data:sv},
+        {data:bl},
+        {data:sc},
+        {data:bb},
+      ] = await Promise.all([
+        sb.from('salons').select('*').eq('id',id).single(),
+        sb.from('services').select('id,name,price,duration,category').eq('salon_id',id).eq('active',true).order('name'),
+        sb.from('blocked_dates').select('date').eq('salon_id',id),
+        sb.from('schedule_config').select('*').eq('salon_id',id),
+        sb.from('barbers').select('id,name,avatar_url,color').eq('salon_id',id).eq('active',true).order('name'),
+      ])
+
       if (e||!s) { setNotFound(true); setLoading(false); return }
       setSalon(s)
       setServices(sv?.length>0?sv:DEFAULT_SVCS)
       setBlocked((bl||[]).map(b=>b.date))
       setSchedCfg(sc||[])
+
+      const activeBarbers = bb || []
+      setBarbers(activeBarbers)
+
+      // Se há ≥2 barbeiros e nenhum foi pré-selecionado via URL, mostrar etapa de escolha
+      if (activeBarbers.length >= 2 && !urlBarber) {
+        setShowBarberStep(true)
+        setEtapa(0)
+      }
+
+      // Se barbeiro foi pré-selecionado via URL, pegar o nome dele
+      if (urlBarber && activeBarbers.length > 0) {
+        const found = activeBarbers.find(b => b.id === urlBarber)
+        if (found) setBarberName(found.name)
+      }
+
       setLoading(false)
       sb.from('page_views').insert({salon_id:id,type:'booking'}).catch(()=>{})
-    })
+    }
 
     if (isUUID) {
       loadById(salonId)
     } else {
-      // Resolve slug → id: busca salões ativos, filtra pelo slug do nome
       sb.from('salons').select('id,name').eq('is_active',true)
         .then(({data:all})=>{
           const match = (all||[]).find(s=>toSlug(s.name)===salonId)
@@ -198,13 +242,17 @@ export default function AgendarPage({ params }) {
   useEffect(()=>{
     if (!dataSel||!salon?.id) return
     setHoraSel('')
-    sb.from('appointments').select('date')
+    let query = sb.from('appointments').select('date')
       .eq('salon_id',salon.id)
       .gte('date',`${dataSel}T00:00:00`)
       .lte('date',`${dataSel}T23:59:59`)
       .not('status','eq','cancelado')
-      .then(({data})=>setOcupados((data||[]).map(a=>a.date?.slice(11,16))))
-  },[dataSel,salon?.id])
+
+    // Filtrar por barbeiro se selecionado — evita conflito entre agendas de barbeiros diferentes
+    if (barberId) query = query.eq('barber_id', barberId)
+
+    query.then(({data})=>setOcupados((data||[]).map(a=>a.date?.slice(11,16))))
+  },[dataSel,salon?.id,barberId])
 
   /* Lookup de cliente por telefone */
   const lookupCliente = async (phoneRaw) => {
@@ -220,7 +268,6 @@ export default function AgendarPage({ params }) {
     if (found) {
       setNome(found.name||'')
       setIsNewClient(false)
-      // Busca próximos agendamentos
       const { data:ap } = await sb.from('appointments')
         .select('id,date,service_name,status')
         .eq('client_id',found.id)
@@ -235,6 +282,18 @@ export default function AgendarPage({ params }) {
     setLookingUp(false)
   }
 
+  /* Selecionar barbeiro (etapa 0) */
+  const selecionarBarbeiro = (b) => {
+    if (b) {
+      setBarberId(b.id)
+      setBarberName(b.name)
+    } else {
+      setBarberId(null)
+      setBarberName(null)
+    }
+    setEtapa(1)
+  }
+
   /* Avança para próxima etapa — validações */
   const avancar = () => {
     if (etapa===1) {
@@ -245,6 +304,15 @@ export default function AgendarPage({ params }) {
     if (etapa===2 && selecionados.length===0) return
     if (etapa===3 && (!dataSel||!horaSel)) return
     setEtapa(e=>e+1)
+  }
+
+  /* Volta para etapa anterior */
+  const voltar = () => {
+    if (etapa === 1 && showBarberStep) {
+      setEtapa(0)
+    } else {
+      setEtapa(e=>e-1)
+    }
   }
 
   /* Confirmar agendamento */
@@ -260,7 +328,6 @@ export default function AgendarPage({ params }) {
       let clientId = clienteEncontrado?.id || null
 
       if (!clientId) {
-        // 1. Tentar INSERT direto (cliente novo)
         const { data:clInsert } = await sb.from('clients').insert({
           salon_id: salon?.id,
           name: nome.trim(),
@@ -275,14 +342,12 @@ export default function AgendarPage({ params }) {
         if (clInsert?.[0]?.id) {
           clientId = clInsert[0].id
         } else {
-          // 2. Cliente já existe — buscar pelo telefone sem resetar dados CRM
           const { data:found } = await sb.from('clients')
             .select('id').eq('salon_id', salon?.id).eq('phone', phoneClean).maybeSingle()
           clientId = found?.id || null
         }
       }
 
-      // Cria agendamento
       const { data:apArr, error:apErr } = await sb.from('appointments').insert({
         salon_id: salon?.id,
         client_id: clientId,
@@ -309,7 +374,16 @@ export default function AgendarPage({ params }) {
   const totalSelecionado = selecionados.reduce((s,sv)=>s+(sv.price||0),0)
   const slots = gerarSlots(schedCfg, dataSel).filter(s=>!ocupados.includes(s))
 
-  /* ── Not found ── */
+  /* Passos do progress */
+  const passos = showBarberStep
+    ? ['Barbeiro','Identidade','Serviços','Data e Hora','Confirmar']
+    : ['Identidade','Serviços','Data e Hora','Confirmar']
+
+  // etapa índice no progress: quando showBarberStep, etapa 0=passo 0, 1=passo 1, etc.
+  // quando não showBarberStep, etapa 1=passo 0, 2=passo 1, etc.
+  const progressIdx = showBarberStep ? etapa : etapa - 1
+
+  /* ── Loading / Not found ── */
   if (loading) return (
     <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F8FAFC'}}>
       <div style={{color:'#64748B',fontSize:14}}>Carregando...</div>
@@ -334,6 +408,7 @@ export default function AgendarPage({ params }) {
           <div style={{fontSize:14,color:'#64748B',marginBottom:20}}>
             <strong>{resultado.svNomes}</strong><br/>
             {dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})} às {resultado.horaSel}<br/>
+            {barberName && <span>com <strong>{barberName}</strong><br/></span>}
             {salon?.name}
           </div>
           {resultado.total>0&&<div style={{fontSize:22,fontWeight:800,color:'#059669',marginBottom:20}}>R${resultado.total.toLocaleString('pt-BR')}</div>}
@@ -351,7 +426,6 @@ export default function AgendarPage({ params }) {
   }
 
   /* ── Layout principal ── */
-  const P = { margin:'0 auto', maxWidth:520, width:'100%' }
   const CARD = { background:'#fff', borderRadius:16, padding:'20px', marginBottom:14, border:'1px solid #E2E8F0', boxShadow:'0 2px 8px rgba(0,0,0,.05)' }
   const LABEL = { display:'block', fontSize:11, fontWeight:700, color:'#64748B', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, marginTop:14 }
   const INP = { width:'100%', padding:'13px 16px', borderRadius:12, border:'1.5px solid #E2E8F0', fontSize:15, outline:'none', color:'#0B1E3D', boxSizing:'border-box', fontFamily:'inherit', background:'#fff', transition:'border .2s' }
@@ -365,11 +439,61 @@ export default function AgendarPage({ params }) {
       <div style={{background:'#0B1E3D',padding:'20px 20px 14px',textAlign:'center'}}>
         {salon.logo_url&&<img src={salon.logo_url} style={{width:56,height:56,borderRadius:28,objectFit:'cover',marginBottom:8}}/>}
         <div style={{fontFamily:'Dancing Script,cursive',fontSize:24,color:'#fff',fontWeight:700}}>{salon.name||'Meu Salão'}</div>
-        <div style={{fontFamily:'Dancing Script,cursive',fontSize:12,color:'rgba(255,255,255,.4)'}}>Agendamento online</div>
+        {/* Badge do barbeiro pré-selecionado via link */}
+        {barberName && etapa > 0 && (
+          <div style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:6,background:'rgba(255,255,255,.12)',borderRadius:20,padding:'4px 12px'}}>
+            <div style={{width:8,height:8,borderRadius:4,background:'#4ade80'}}/>
+            <span style={{fontSize:12,color:'rgba(255,255,255,.85)',fontWeight:600}}>{barberName}</span>
+          </div>
+        )}
+        <div style={{fontFamily:'Dancing Script,cursive',fontSize:12,color:'rgba(255,255,255,.4)',marginTop:barberName&&etapa>0?4:0}}>Agendamento online</div>
       </div>
 
       <div style={{padding:'20px 16px',maxWidth:560,margin:'0 auto'}}>
-        <Progress etapa={etapa} total={4}/>
+        {/* Progress — não mostra na etapa 0 */}
+        {etapa > 0 && <Progress etapa={progressIdx} passos={passos}/>}
+
+        {/* ── Etapa 0: Escolha o barbeiro ── */}
+        {etapa===0&&(
+          <div>
+            <div style={CARD}>
+              <div style={{fontSize:16,fontWeight:800,color:'#0B1E3D',marginBottom:4}}>Com quem você quer ser atendido?</div>
+              <div style={{fontSize:12,color:'#64748B',marginBottom:20}}>Escolha o profissional ou deixe sem preferência</div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+                {barbers.map(b=>(
+                  <button key={b.id} onClick={()=>selecionarBarbeiro(b)}
+                    style={{display:'flex',alignItems:'center',gap:14,padding:'14px 16px',borderRadius:14,border:'2px solid #E2E8F0',background:'#fff',cursor:'pointer',textAlign:'left',transition:'all .15s'}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#1B3057';e.currentTarget.style.background='#EFF6FF'}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor='#E2E8F0';e.currentTarget.style.background='#fff'}}
+                  >
+                    <div style={{
+                      width:48,height:48,borderRadius:24,
+                      background:b.color||'#1B3057',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:18,fontWeight:800,color:'#fff',flexShrink:0,
+                    }}>
+                      {b.avatar_url
+                        ? <img src={b.avatar_url} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:24}} alt={b.name}/>
+                        : (b.name||'?')[0].toUpperCase()
+                      }
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:15,color:'#0B1E3D'}}>{b.name}</div>
+                    </div>
+                    <div style={{color:'#CBD5E1',fontSize:18}}>›</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Sem preferência */}
+              <button onClick={()=>selecionarBarbeiro(null)}
+                style={{width:'100%',padding:'12px',borderRadius:12,border:'1.5px dashed #CBD5E1',background:'transparent',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                Sem preferência
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Etapa 1: Identidade ── */}
         {etapa===1&&(
@@ -391,7 +515,7 @@ export default function AgendarPage({ params }) {
             {/* Cliente encontrado */}
             {isNewClient===false && !outraPessoa && (
               <div style={{marginTop:12,padding:'12px 14px',background:'#D1FAE5',borderRadius:12,border:'1px solid #6EE7B7'}}>
-                <div style={{fontSize:13,fontWeight:800,color:'#065F46',marginBottom:4}}>Olá, {clienteEncontrado?.name?.split(' ')[0]}! 👋</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#065F46',marginBottom:4}}>Olá, {clienteEncontrado?.name?.split(' ')[0]}!</div>
                 <div style={{fontSize:12,color:'#047857'}}>Encontramos seu cadastro.</div>
                 {proximosAppts.length>0&&(
                   <div style={{marginTop:10}}>
@@ -440,7 +564,7 @@ export default function AgendarPage({ params }) {
               </div>
             )}
 
-            {/* Origem — só clientes novos */}
+            {/* Origem */}
             {isNewClient && !outraPessoa && (
               <div>
                 <label style={LABEL}>Como nos encontrou? *</label>
@@ -462,6 +586,13 @@ export default function AgendarPage({ params }) {
               <button onClick={avancar} style={BTN_PRI}
                 disabled={!fone||fone.replace(/\D/g,'').length<10||!nome.trim()||(isNewClient&&!origem&&!outraPessoa)}>
                 Escolher serviço →
+              </button>
+            )}
+
+            {/* Voltar para barbeiro */}
+            {showBarberStep && (
+              <button onClick={()=>setEtapa(0)} style={{width:'100%',padding:'10px',borderRadius:12,border:'1px solid #E2E8F0',background:'transparent',color:'#64748B',fontSize:13,fontWeight:600,cursor:'pointer',marginTop:8}}>
+                ← Trocar barbeiro
               </button>
             )}
           </div>
@@ -516,7 +647,7 @@ export default function AgendarPage({ params }) {
             <input style={INP} placeholder="Ex: degradê na lateral, franja, mechas..." value={cutPref} onChange={e=>setCutPref(e.target.value)}/>
 
             <div style={{display:'flex',gap:8,marginTop:16}}>
-              <button onClick={()=>setEtapa(1)} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
+              <button onClick={voltar} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
               <button onClick={avancar} disabled={selecionados.length===0} style={{flex:1,padding:'14px',borderRadius:12,border:'none',background:selecionados.length?'#1B3057':'#E2E8F0',color:selecionados.length?'#fff':'#94A3B8',fontSize:14,fontWeight:700,cursor:selecionados.length?'pointer':'not-allowed'}}>
                 Escolher data →
               </button>
@@ -536,6 +667,7 @@ export default function AgendarPage({ params }) {
               <div style={CARD}>
                 <div style={{fontSize:13,fontWeight:700,color:'#0B1E3D',marginBottom:12}}>
                   Horários disponíveis · {new Date(dataSel+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}
+                  {barberName&&<span style={{color:'#64748B',fontWeight:500}}> · {barberName}</span>}
                 </div>
                 {slots.length===0
                   ? <div style={{textAlign:'center',color:'#94A3B8',padding:16,fontSize:13}}>Sem horários disponíveis neste dia.</div>
@@ -554,7 +686,7 @@ export default function AgendarPage({ params }) {
             )}
 
             <div style={{display:'flex',gap:8,marginTop:4}}>
-              <button onClick={()=>setEtapa(2)} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
+              <button onClick={voltar} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
               <button onClick={avancar} disabled={!dataSel||!horaSel} style={{flex:1,padding:'14px',borderRadius:12,border:'none',background:dataSel&&horaSel?'#1B3057':'#E2E8F0',color:dataSel&&horaSel?'#fff':'#94A3B8',fontSize:14,fontWeight:700,cursor:dataSel&&horaSel?'pointer':'not-allowed'}}>
                 Revisar e confirmar →
               </button>
@@ -570,6 +702,7 @@ export default function AgendarPage({ params }) {
               {[
                 ['Quem', nome],
                 ['WhatsApp', fone],
+                ...(barberName?[['Profissional',barberName]]:[]),
                 ['Serviço', selecionados.map(s=>s.name).join(', ')],
                 ['Data', dataSel?new Date(dataSel+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}):''],
                 ['Horário', horaSel],
@@ -592,7 +725,7 @@ export default function AgendarPage({ params }) {
               </div>
             )}
             <div style={{display:'flex',gap:8,marginTop:4}}>
-              <button onClick={()=>setEtapa(3)} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
+              <button onClick={voltar} style={{flex:'0 0 auto',padding:'14px 20px',borderRadius:12,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:14,fontWeight:600,cursor:'pointer'}}>←</button>
               <button onClick={confirmar} disabled={salvando}
                 style={{flex:1,padding:'14px',borderRadius:12,border:'none',background:salvando?'#E2E8F0':'#1B3057',color:salvando?'#94A3B8':'#fff',fontSize:15,fontWeight:700,cursor:salvando?'not-allowed':'pointer'}}>
                 {salvando?'Agendando...':'✓ Confirmar agendamento'}
