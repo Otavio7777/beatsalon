@@ -460,12 +460,12 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
     setSaving(true)
     const val = Number(valor) || 0
     if (modo === 'realizado') {
-      await sb.from('appointments').update({
+      const { error: apptErr } = await sb.from('appointments').update({
         status: 'concluido',
         payment_method: pagamento,
         value: val,
-        price: val,
       }).eq('id', appt.id)
+      if (apptErr) { console.error('Erro ao concluir:', apptErr); setSaving(false); return }
       // Atualiza CRM do cliente
       if (appt.client_id) {
         const { data: cur } = await sb.from('clients')
@@ -481,7 +481,8 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
         }
       }
     } else {
-      await sb.from('appointments').update({ status: 'faltou' }).eq('id', appt.id)
+      const { error: faltouErr } = await sb.from('appointments').update({ status: 'faltou' }).eq('id', appt.id)
+      if (faltouErr) { console.error('Erro faltou:', faltouErr); setSaving(false); return }
     }
     setSaving(false)
     setDone(true)
