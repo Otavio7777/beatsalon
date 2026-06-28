@@ -575,6 +575,118 @@ function ConcludeModal({ appt, salonName, onClose, onSaved }) {
   )
 }
 
+
+/* ── Níveis CRM (para resumo) ── */
+const NIVEIS_AG = {
+  novo:     { label:'Novo',     cor:'#475569', bg:'#F1F5F9' },
+  bronze:   { label:'Bronze',   cor:'#92400E', bg:'#FEF7ED' },
+  prata:    { label:'Prata',    cor:'#334155', bg:'#F1F5F9' },
+  ouro:     { label:'Ouro',     cor:'#92400E', bg:'#FFFBEB' },
+  diamante: { label:'Diamante', cor:'#5B21B6', bg:'#F5F3FF' },
+  em_risco: { label:'Em risco', cor:'#B91C1C', bg:'#FEF2F2' },
+}
+function calcNivelAg(c) {
+  const visits = c.visit_count||0
+  const ltv    = parseFloat(c.ltv)||0
+  const last   = c.last_visit
+  const dias   = last ? Math.floor((Date.now()-new Date(last+'T00:00').getTime())/864e5) : null
+  if (visits>0 && dias!==null && dias>45) return 'em_risco'
+  if (visits===0) return 'novo'
+  if (visits>=16||ltv>=1000) return 'diamante'
+  if (visits>=9 ||ltv>=500)  return 'ouro'
+  if (visits>=4 ||ltv>=200)  return 'prata'
+  return 'bronze'
+}
+
+function ClienteResumoModal({ appt, salonId, onClose }) {
+  const [cli, setCli] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const sb = createClient()
+
+  useEffect(()=>{
+    if (!appt?.client_id) return
+    setLoading(true)
+    sb.from('clients')
+      .select('id,name,phone,visit_count,ltv,last_visit,first_visit,preferred_cut,allergies,notes_internal,main_service,avatar_color')
+      .eq('id', appt.client_id)
+      .single()
+      .then(({data})=>{ setCli(data||null); setLoading(false) })
+  },[appt?.client_id])
+
+  const nivel = cli ? NIVEIS_AG[calcNivelAg(cli)] : null
+  const ini = (appt.client_name||'?').trim().split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()
+  const cor = cli?.avatar_color||'#1B3057'
+  const dias = cli?.last_visit ? Math.floor((Date.now()-new Date(cli.last_visit+'T00:00').getTime())/864e5) : null
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',zIndex:60,display:'flex',alignItems:'flex-end',justifyContent:'center'}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'20px 20px 32px',width:'100%',maxWidth:520,maxHeight:'80vh',overflowY:'auto'}}>
+        <div style={{width:36,height:4,borderRadius:2,background:'#E2E8F0',margin:'0 auto 16px'}}/>
+        {/* Header cliente */}
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+          <div style={{width:48,height:48,borderRadius:24,background:cor,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,fontWeight:800,flexShrink:0}}>{ini}</div>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:800,fontSize:16,color:'#0B1E3D'}}>{appt.client_name}</div>
+            <div style={{fontSize:12,color:'#64748B',marginTop:2}}>{appt.service_name||'—'}</div>
+          </div>
+          {nivel&&<span style={{padding:'4px 10px',borderRadius:20,background:nivel.bg,color:nivel.cor,fontSize:11,fontWeight:700}}>{nivel.label}</span>}
+        </div>
+
+        {loading && <div style={{textAlign:'center',padding:'24px',color:'#94A3B8',fontSize:13}}>Carregando...</div>}
+
+        {!loading && !cli && appt.client_id && (
+          <div style={{textAlign:'center',padding:'16px',color:'#94A3B8',fontSize:13}}>Dados não encontrados.</div>
+        )}
+
+        {!loading && !appt.client_id && (
+          <div style={{padding:'12px',background:'#F8FAFC',borderRadius:10,fontSize:13,color:'#64748B',textAlign:'center'}}>
+            Cliente sem cadastro no CRM.<br/>
+            <span style={{fontSize:12}}>Conclua o atendimento para vincular automaticamente.</span>
+          </div>
+        )}
+
+        {!loading && cli && (<>
+          {/* Stats */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
+            {[
+              ['Visitas', cli.visit_count||0],
+              ['LTV', `R$${Number(cli.ltv||0).toLocaleString('pt-BR')}`],
+              ['Dias s/ visita', dias!==null?dias:'—'],
+            ].map(([lbl,val])=>(
+              <div key={lbl} style={{background:'#F8FAFC',borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
+                <div style={{fontSize:15,fontWeight:800,color:'#0B1E3D'}}>{val}</div>
+                <div style={{fontSize:10,color:'#94A3B8',marginTop:2,fontWeight:600,textTransform:'uppercase',letterSpacing:'.4px'}}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Preferências */}
+          {(cli.preferred_cut||cli.main_service||cli.allergies||cli.notes_internal)&&(
+            <div style={{background:'#F8FAFC',borderRadius:12,padding:'12px 14px',marginBottom:12}}>
+              {cli.preferred_cut&&<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.4px'}}>Corte preferido</span><div style={{fontSize:13,color:'#0B1E3D',marginTop:2,fontWeight:600}}>{cli.preferred_cut}</div></div>}
+              {cli.main_service&&<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.4px'}}>Serviço principal</span><div style={{fontSize:13,color:'#0B1E3D',marginTop:2}}>{cli.main_service}</div></div>}
+              {cli.allergies&&<div style={{marginBottom:6}}><span style={{fontSize:10,fontWeight:700,color:'#B91C1C',textTransform:'uppercase',letterSpacing:'.4px'}}>Alergias</span><div style={{fontSize:13,color:'#B91C1C',marginTop:2,fontWeight:600}}>{cli.allergies}</div></div>}
+              {cli.notes_internal&&<div><span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.4px'}}>Notas</span><div style={{fontSize:13,color:'#334155',marginTop:2}}>{cli.notes_internal}</div></div>}
+            </div>
+          )}
+
+          {/* Botão WhatsApp */}
+          {cli.phone&&(
+            <a href={`https://wa.me/55${cli.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`Olá ${cli.name.split(' ')[0]}! 😊`)}`}
+              target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'12px',borderRadius:11,background:'#25D366',color:'#fff',fontSize:14,fontWeight:700,textDecoration:'none',marginTop:4}}>
+              WhatsApp
+            </a>
+          )}
+        </>)}
+
+        <button onClick={onClose} style={{width:'100%',marginTop:10,padding:'11px',borderRadius:11,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',fontSize:13,cursor:'pointer',fontWeight:600}}>Fechar</button>
+      </div>
+    </div>
+  )
+}
+
 export default function AgendaPage() {
   const { salon, user, loading:sl } = useSalon()
   const [appts, setAppts]     = useState([])
@@ -588,6 +700,7 @@ export default function AgendaPage() {
   const [showModal, setShowModal] = useState(false)
   const [editAppt, setEditAppt]  = useState(null)
   const [schedCfg, setSchedCfg]  = useState([])
+  const [clienteResumo, setClienteResumo] = useState(null)
   const sb = createClient()
 
   const load = useCallback(async()=>{
@@ -664,7 +777,7 @@ export default function AgendaPage() {
                   <div style={{fontSize:12,fontWeight:800}}>{fmtHM(a.date)}</div>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.client_name}</div>
+                  <div onClick={()=>setClienteResumo(a)} style={{fontWeight:700,fontSize:13,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(255,255,255,.4)',textDecorationThickness:1}}>{a.client_name}</div>
                   <div style={{fontSize:11,opacity:.6}}>{a.service_name||'–'}</div>
                 </div>
                 {phone && (
@@ -778,7 +891,7 @@ export default function AgendaPage() {
                       </div>
                       <div style={{flex:1}}>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:3}}>
-                          <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{a.client_name}</span>
+                          <span onClick={()=>setClienteResumo(a)} style={{fontWeight:800,fontSize:14,color:'var(--navy-900)',cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(11,30,61,.25)',textDecorationThickness:1}}>{a.client_name}</span>
                           <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
                         </div>
                         <div style={{fontSize:12,color:'var(--muted)'}}>{a.service_name||'—'}{a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}</div>
@@ -879,7 +992,7 @@ export default function AgendaPage() {
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
-                          <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{a.client_name}</span>
+                          <span onClick={()=>setClienteResumo(a)} style={{fontWeight:800,fontSize:14,color:'var(--navy-900)',cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(11,30,61,.25)',textDecorationThickness:1}}>{a.client_name}</span>
                           <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
                         </div>
                         <div style={{fontSize:12,color:'var(--muted)'}}>
@@ -932,6 +1045,13 @@ export default function AgendaPage() {
           schedCfg={schedCfg}
           onClose={()=>setRemarcarModal(null)}
           onSaved={()=>{ load(); setRemarcarModal(null) }}
+        />
+      )}
+      {clienteResumo && (
+        <ClienteResumoModal
+          appt={clienteResumo}
+          salonId={salon?.id}
+          onClose={()=>setClienteResumo(null)}
         />
       )}
       {concludeModal && (

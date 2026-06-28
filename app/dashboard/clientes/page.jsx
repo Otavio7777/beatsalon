@@ -45,17 +45,33 @@ function Avatar({ name='?', color='#1B3057', size=38 }) {
 function ClienteModal({ salonId, cliente, onClose, onSaved }) {
   const [f, setF] = useState({ name:'', phone:'', email:'', birth_date:'', status:'ativo', preferred_cut:'', allergies:'', notes_internal:'', avatar_color:'#1B3057', ...cliente })
   const [saving, setSaving] = useState(false)
+  const [errMsg, setErrMsg] = useState('')
   const sb = createClient()
   const set = (k,v) => setF(p=>({...p,[k]:v}))
   const save = async () => {
     if (!f.name.trim()) return
     setSaving(true)
-    const pay = {...f, salon_id:salonId}
-    const {error} = cliente?.id
-      ? await sb.from('clients').update(pay).eq('id',cliente.id)
-      : await sb.from('clients').insert(pay)
-    if (!error) { onSaved(); onClose() }
-    setSaving(false)
+    setErrMsg('')
+    try {
+      const pay = {
+        ...f,
+        salon_id: salonId,
+        birth_date: f.birth_date || null,
+        email: f.email || null,
+        phone: f.phone || null,
+      }
+      // Remove id from new-client payload
+      if (!cliente?.id) delete pay.id
+      const {error} = cliente?.id
+        ? await sb.from('clients').update(pay).eq('id',cliente.id)
+        : await sb.from('clients').insert(pay)
+      if (!error) { onSaved(); onClose() }
+      else setErrMsg(error.message || 'Erro ao salvar.')
+    } catch(e) {
+      setErrMsg('Erro inesperado. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
   const CORES = ['#1B3057','#059669','#DC2626','#D97706','#7C3AED','#0891B2','#BE185D','#374151']
   const S = { inp:{width:'100%',padding:'10px 12px',borderRadius:9,border:'1.5px solid #E2E8F0',fontSize:14,outline:'none',boxSizing:'border-box',background:'#fff',color:'#0B1E3D',fontFamily:'inherit'},
@@ -83,6 +99,7 @@ function ClienteModal({ salonId, cliente, onClose, onSaved }) {
         <input style={S.inp} placeholder="Ex: alergia a amônia..." value={f.allergies||''} onChange={e=>set('allergies',e.target.value)}/>
         <label style={S.lbl}>Notas internas</label>
         <textarea style={{...S.inp,resize:'none',minHeight:60}} placeholder="Obs para a equipe..." value={f.notes_internal||''} onChange={e=>set('notes_internal',e.target.value)}/>
+        {errMsg&&<div style={{marginTop:10,padding:'10px 12px',borderRadius:8,background:'#FEF2F2',color:'#B91C1C',fontSize:13,fontWeight:600}}>{errMsg}</div>}
         <div style={{display:'flex',gap:8,marginTop:18}}>
           <button onClick={save} disabled={saving||!f.name.trim()} style={{flex:1,padding:'13px',borderRadius:11,border:'none',background:saving||!f.name.trim()?'#E2E8F0':'#0B1E3D',color:saving||!f.name.trim()?'#94A3B8':'#fff',fontSize:14,fontWeight:700,cursor:'pointer'}}>
             {saving?'Salvando...':cliente?.id?'Salvar':'Adicionar'}
