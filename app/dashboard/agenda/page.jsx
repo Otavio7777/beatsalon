@@ -63,10 +63,10 @@ function waRemarcar(appt, salonName) {
 }
 
 /* ── Modal de agendamento ── */
-function AgModal({ salonId, appt, onClose, onSaved }) {
+function AgModal({ salonId, appt, onClose, onSaved, barbers = [], defaultBarberId = null, lockBarber = false }) {
   const [form, setForm] = useState({
     client_name:'', client_id:null, client_phone:'', service_name:'', date:'',
-    value:'', status:'agendado', notes:'', ...appt,
+    value:'', status:'agendado', notes:'', barber_id: defaultBarberId, ...appt,
   })
   const [clientSearch, setClientSearch] = useState(appt?.client_name||'')
   const [clients,  setClients]   = useState([])
@@ -127,7 +127,8 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
     let cid = form.client_id||null, crmRes = null
     if (!cid&&form.client_phone) { crmRes = await autoVincular(form.client_phone); if(crmRes) cid=crmRes.client_id }
     const payload = {client_name:form.client_name,client_id:cid,service_name:form.service_name,
-      date:form.date,value:Number(form.value)||0,status:form.status,notes:form.notes,salon_id:salonId}
+      date:form.date,value:Number(form.value)||0,status:form.status,notes:form.notes,salon_id:salonId,
+      barber_id:form.barber_id||null}
     if (appt?.id) {
       await sb.from('appointments').update(payload).eq('id',appt.id)
       if (form.status==='concluido'&&cid) await updateStats(cid,form.date,form.value,appt.status)
@@ -221,6 +222,17 @@ function AgModal({ salonId, appt, onClose, onSaved }) {
             </select>
           </div>
         </div>
+
+        {barbers.length > 0 && (
+          <div>
+            <label style={lS}>Profissional</label>
+            <select style={{...iS}} value={form.barber_id||''} disabled={lockBarber}
+              onChange={e=>set('barber_id',e.target.value||null)}>
+              <option value="">Sem preferência</option>
+              {barbers.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <label style={lS}>Data e horário *</label>
         <input style={iS} type="datetime-local" value={form.date} onChange={e=>set('date',e.target.value)} />
@@ -688,7 +700,7 @@ function ClienteResumoModal({ appt, salonId, onClose }) {
 }
 
 export default function AgendaPage() {
-  const { salon, user, loading:sl } = useSalon()
+  const { salon, user, loading:sl, isBarber, barberData } = useSalon()
   const [appts, setAppts]     = useState([])
   const [loading, setLoading] = useState(true)
   const [concludeModal, setConcludeModal] = useState(null)
@@ -706,12 +718,14 @@ export default function AgendaPage() {
   const load = useCallback(async()=>{
     if (!salon?.id) return
     setLoading(true)
-    const [{ data }, { data: sched }] = await Promise.all([
+    const [{ data }, { data: sched }, { data: bb }] = await Promise.all([
       sb.from('appointments').select('*').eq('salon_id', salon.id).order('date'),
       sb.from('schedule_config').select('*').eq('salon_id', salon.id),
+      sb.from('barbers').select('id,name,color').eq('salon_id', salon.id).eq('active', true).order('name'),
     ])
     setAppts(data||[])
     setSchedCfg(sched||[])
+    setBarbers(bb||[])
     setLoading(false)
   },[salon?.id])
 
@@ -719,6 +733,12 @@ export default function AgendaPage() {
   useEffect(()=>{ if(!sl&&!user) window.location.href='/login' },[sl,user])
 
   const del = async(id)=>{ if(!confirm('Remover?')) return; await sb.from('appointments').delete().eq('id',id); load() }
+
+  /* ── Filtro por barbeiro ── */
+  // Barbeiro logado (ou gestor em modo barbeiro) vê APENAS os próprios agendamentos
+  const effectiveFilter = (isBarber && barberData?.id) ? barberData.id : barberFiltro
+  const visibleAppts = effectiveFilter === 'todos' ? appts : appts.filter(a => a.barber_id === effectiveFilter)
+  const barberById = id => barbers.find(b => b.id === id)
 
   const quickConcluir = async(appt) => {
     await sb.from('appointments').update({status:'concluido'}).eq('id',appt.id)
@@ -731,19 +751,19 @@ export default function AgendaPage() {
 
   const weekStart = d => { const day=d.getDay(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()-day) }
   const weekDays  = () => { const s=weekStart(currDate); return Array.from({length:7},(_,i)=>new Date(s.getFullYear(),s.getMonth(),s.getDate()+i)) }
-  const apptsByDate = date => { const ds=date.toISOString().slice(0,10); return appts.filter(a=>a.date?.startsWith(ds)).sort((a,b)=>a.date.localeCompare(b.date)) }
+  const apptsByDate = date => { const ds=date.toISOString().slice(0,10); return visibleAppts.filter(a=>a.date?.startsWith(ds)).sort((a,b)=>a.date.localeCompare(b.date)) }
   const isToday = d => d.toDateString()===today().toDateString()
 
   /* Lembretes: agendamentos de amanhã */
   const tomorrow = new Date(today()); tomorrow.setDate(tomorrow.getDate()+1)
   const tomorrowStr = tomorrow.toISOString().slice(0,10)
-  const lembretes = appts.filter(a=>a.date?.startsWith(tomorrowStr)&&a.status==='agendado')
+  const lembretes = visibleAppts.filter(a=>a.date?.startsWith(tomorrowStr)&&a.status==='agendado')
 
   const todayStr = today().toISOString().slice(0,10)
   const stats = {
-    hoje:    appts.filter(a=>a.date?.startsWith(todayStr)).length,
-    semana:  appts.length,
-    receita: appts.filter(a=>a.status==='concluido'&&a.date?.startsWith(monthYearBRT())).reduce((s,a)=>s+(a.value||0),0),
+    hoje:    visibleAppts.filter(a=>a.date?.startsWith(todayStr)).length,
+    semana:  visibleAppts.length,
+    receita: visibleAppts.filter(a=>a.status==='concluido'&&a.date?.startsWith(monthYearBRT())).reduce((s,a)=>s+(a.value||0),0),
   }
 
   if (sl) return <div style={{padding:48,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
@@ -810,6 +830,31 @@ export default function AgendaPage() {
         </button>
       </div>
 
+      {/* Filtro por barbeiro — apenas gestor com 2+ barbeiros; barbeiro logado vê só a própria agenda */}
+      {!isBarber && barbers.length >= 2 && (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+          <button onClick={()=>setBarberFiltro('todos')}
+            style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${barberFiltro==='todos'?'#0B1E3D':'#E2E8F0'}`,background:barberFiltro==='todos'?'#0B1E3D':'#fff',color:barberFiltro==='todos'?'#fff':'#64748B',fontSize:12,fontWeight:700,cursor:'pointer',minHeight:34}}>
+            Todos
+          </button>
+          {barbers.map(b=>(
+            <button key={b.id} onClick={()=>setBarberFiltro(b.id)}
+              style={{padding:'6px 14px',borderRadius:20,border:`1.5px solid ${barberFiltro===b.id?(b.color||'#1B3057'):'#E2E8F0'}`,background:barberFiltro===b.id?(b.color||'#1B3057'):'#fff',color:barberFiltro===b.id?'#fff':'#64748B',fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6,minHeight:34}}>
+              <div style={{width:8,height:8,borderRadius:4,background:b.color||'#1B3057',display:barberFiltro===b.id?'none':'block'}}/>
+              {b.name?.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Aviso na visão do barbeiro */}
+      {isBarber && barberData?.name && (
+        <div style={{display:'flex',alignItems:'center',gap:8,background:'var(--navy-50)',border:'1px solid var(--navy-200)',borderRadius:10,padding:'8px 14px',marginBottom:14,fontSize:12,fontWeight:600,color:'var(--navy-700)'}}>
+          <div style={{width:8,height:8,borderRadius:4,background:barberData.color||'#1B3057'}}/>
+          Mostrando apenas os agendamentos de {barberData.name}
+        </div>
+      )}
+
       {/* Calendário semanal */}
       {view==='semana' && (
         <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
@@ -828,7 +873,7 @@ export default function AgendaPage() {
                     return (
                       <div key={a.id}
                         onClick={e=>{e.stopPropagation();setEditAppt(a);setShowModal(true)}}
-                        style={{fontSize:10,padding:'3px 6px',borderRadius:5,marginBottom:2,background:cfg.bg,color:cfg.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>
+                        style={{fontSize:10,padding:'3px 6px',borderRadius:5,marginBottom:2,background:cfg.bg,color:cfg.color,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer',borderLeft:`3px solid ${barberById(a.barber_id)?.color||'transparent'}`}}>
                         {fmtHM(a.date)} {a.client_name}
                         {a.client_id&&<span title="Vinculado ao CRM" style={{marginLeft:2,display:'inline-flex',alignItems:'center'}}><CheckCircle size={10} color="#059669"/></span>}
                       </div>
@@ -845,27 +890,12 @@ export default function AgendaPage() {
       {/* Lista */}
 
 
-      {/* Filtro por barbeiro */}
-      {barbers.length > 0 && (
-        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
-          <button onClick={()=>setBarberFiltro('todos')}
-            style={{padding:'5px 12px',borderRadius:20,border:`1.5px solid ${barberFiltro==='todos'?'#0B1E3D':'#E2E8F0'}`,background:barberFiltro==='todos'?'#0B1E3D':'#fff',color:barberFiltro==='todos'?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:'pointer'}}>
-            Todos
-          </button>
-          {barbers.map(b=>(
-            <button key={b.id} onClick={()=>setBarberFiltro(b.id)}
-              style={{padding:'5px 12px',borderRadius:20,border:`1.5px solid ${barberFiltro===b.id?b.color||'#1B3057':'#E2E8F0'}`,background:barberFiltro===b.id?b.color||'#1B3057':'#fff',color:barberFiltro===b.id?'#fff':'#64748B',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
-              <div style={{width:8,height:8,borderRadius:4,background:b.color||'#1B3057',opacity:barberFiltro===b.id?0:1}}/>
-              {b.name?.split(' ')[0]}
-            </button>
-          ))}
-        </div>
-      )}
+
       {/* Hoje */}
       {(view==='hoje'||view==='amanha') && (() => {
         const targetDate = view==='hoje' ? nowBRT() : (() => { const d=nowBRT(); d.setDate(d.getDate()+1); return d })()
         const dayStr = targetDate.toISOString().slice(0,10)
-        const dayAppts = appts.filter(a => a.date?.startsWith(dayStr)).sort((a,b)=>a.date>b.date?1:-1)
+        const dayAppts = visibleAppts.filter(a => a.date?.startsWith(dayStr)).sort((a,b)=>a.date>b.date?1:-1)
         return (
           <div>
             <div style={{padding:'14px 16px',background:'var(--navy-50)',borderRadius:'12px 12px 0 0',borderBottom:'2px solid var(--border)'}}>
@@ -893,6 +923,7 @@ export default function AgendaPage() {
                         <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:3}}>
                           <span onClick={()=>setClienteResumo(a)} style={{fontWeight:800,fontSize:14,color:'var(--navy-900)',cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(11,30,61,.25)',textDecorationThickness:1}}>{a.client_name}</span>
                           <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
+                          {(()=>{const bb=barberById(a.barber_id);return bb?<span className="badge" style={{background:bb.color||'#1B3057',color:'#fff'}}>{bb.name?.split(' ')[0]}</span>:null})()}
                         </div>
                         <div style={{fontSize:12,color:'var(--muted)'}}>{a.service_name||'—'}{a.value>0&&<span style={{color:'var(--success)',fontWeight:700,marginLeft:6}}>R${Number(a.value).toLocaleString('pt-BR')}</span>}</div>
                         {a.cut_preference&&<div style={{fontSize:11,color:'var(--navy-500)',marginTop:2,display:'flex',alignItems:'center',gap:3}}><Scissors size={10} color="var(--navy-500)"/> {a.cut_preference}</div>}
@@ -935,7 +966,7 @@ export default function AgendaPage() {
           <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden'}}>
             <div style={{padding:'14px 16px',borderBottom:'2px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontWeight:800,fontSize:14,color:'var(--navy-900)'}}>{MESES_N[mes]} {ano}</span>
-              <span style={{fontSize:12,color:'var(--muted)'}}>{appts.filter(a=>a.date?.startsWith(str(1).slice(0,7))).length} agendamentos no mês</span>
+              <span style={{fontSize:12,color:'var(--muted)'}}>{visibleAppts.filter(a=>a.date?.startsWith(str(1).slice(0,7))).length} agendamentos no mês</span>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',borderBottom:'1px solid var(--gray-100)'}}>
               {['D','S','T','Q','Q','S','S'].map((d,i)=>(
@@ -946,7 +977,7 @@ export default function AgendaPage() {
               {cells.map((d,i)=>{
                 if (!d) return <div key={`e${i}`} style={{minHeight:60,borderRight:'1px solid var(--gray-100)',borderBottom:'1px solid var(--gray-100)'}}/>
                 const dayStr = str(d)
-                const dayAppts = appts.filter(a=>a.date?.startsWith(dayStr))
+                const dayAppts = visibleAppts.filter(a=>a.date?.startsWith(dayStr))
                 const isTdy = new Date(ano,mes,d).toDateString()===hoje.toDateString()
                 return (
                   <div key={d} style={{minHeight:60,padding:4,borderRight:'1px solid var(--gray-100)',borderBottom:'1px solid var(--gray-100)',background:isTdy?'var(--navy-50)':'transparent'}}>
@@ -956,7 +987,7 @@ export default function AgendaPage() {
                     {dayAppts.slice(0,3).map((a,ai)=>{
                       const cfg=STATUS[a.status]||STATUS.agendado
                       return (
-                        <div key={ai} style={{fontSize:9,fontWeight:600,color:cfg.color,background:cfg.bg,borderRadius:3,padding:'1px 4px',marginBottom:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                        <div key={ai} style={{fontSize:9,fontWeight:600,color:cfg.color,background:cfg.bg,borderRadius:3,padding:'1px 4px',marginBottom:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer',borderLeft:`3px solid ${barberById(a.barber_id)?.color||'transparent'}`}}
                           onClick={()=>{setEditAppt(a);setShowModal(true)}}>
                           {fmtHM(a.date)} {a.client_name?.split(' ')[0]}
                         </div>
@@ -975,14 +1006,14 @@ export default function AgendaPage() {
         <div style={{background:'var(--white)',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.04)'}}>
           {loading
             ? <div style={{padding:32,textAlign:'center',color:'var(--muted)'}}>Carregando...</div>
-            : appts.length===0
+            : visibleAppts.length===0
               ? <div style={{padding:32,textAlign:'center',color:'var(--muted)',fontSize:13}}>Nenhum agendamento. Clique em "Agendar" para começar.</div>
-              : appts.map((a,i)=>{
+              : visibleAppts.map((a,i)=>{
                 const cfg = STATUS[a.status]||STATUS.agendado
                 const dt  = new Date(a.date)
                 const isAgendado = a.status === 'agendado'
                 return (
-                  <div key={a.id} style={{padding:'14px 16px',borderBottom:i<appts.length-1?'1px solid var(--gray-100)':'none'}}>
+                  <div key={a.id} style={{padding:'14px 16px',borderBottom:i<visibleAppts.length-1?'1px solid var(--gray-100)':'none'}}>
                     {/* Info: mini-cal + nome + badges */}
                     <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:isAgendado?10:0}}>
                       <div style={{width:48,textAlign:'center',background:isAgendado?'var(--navy-600)':'var(--gray-100)',borderRadius:10,padding:'6px 4px',flexShrink:0}}>
@@ -994,6 +1025,7 @@ export default function AgendaPage() {
                         <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
                           <span onClick={()=>setClienteResumo(a)} style={{fontWeight:800,fontSize:14,color:'var(--navy-900)',cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(11,30,61,.25)',textDecorationThickness:1}}>{a.client_name}</span>
                           <span className="badge" style={{background:cfg.bg,color:cfg.color}}>{cfg.label}</span>
+                          {(()=>{const bb=barberById(a.barber_id);return bb?<span className="badge" style={{background:bb.color||'#1B3057',color:'#fff'}}>{bb.name?.split(' ')[0]}</span>:null})()}
                         </div>
                         <div style={{fontSize:12,color:'var(--muted)'}}>
                           {a.service_name||'—'}
@@ -1035,7 +1067,7 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {showModal&&salon&&<AgModal salonId={salon.id} appt={editAppt} onClose={()=>setShowModal(false)} onSaved={load} />}
+      {showModal&&salon&&<AgModal salonId={salon.id} appt={editAppt} onClose={()=>setShowModal(false)} onSaved={load} barbers={barbers} defaultBarberId={isBarber?barberData?.id:null} lockBarber={isBarber} />}
       {remarcarModal && (
         <RemarcarModal
           appt={remarcarModal}
